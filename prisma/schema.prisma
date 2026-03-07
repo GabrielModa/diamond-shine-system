@@ -1,0 +1,20 @@
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String?
+  role      Role     @default(EMPLOYEE)
+  provider  AuthProvider
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  EMPLOYEE
+  VIEWER
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
