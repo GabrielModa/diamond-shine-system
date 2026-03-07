@@ -4,6 +4,10 @@ This document defines how AI agents (Codex or other automated coding agents) sho
 
 Agents must follow these architectural rules when generating or modifying code.
 
+Agents must never push directly to the main branch.
+
+All changes must be proposed through pull requests.
+
 ---
 
 # Project Overview
