@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
+import { CreateUserForm } from "@/src/components/forms/CreateUserForm";
+import { UpdateUserRoleForm } from "@/src/components/forms/UpdateUserRoleForm";
 
 type UserRow = {
   id: string;
@@ -36,7 +38,8 @@ export default async function UsersPage() {
   const users = await getUsers();
 
   return (
-    <DashboardLayout title="Users">
+    <DashboardLayout currentPath="/users" title="Users">
+      <CreateUserForm />
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-600">
@@ -45,6 +48,7 @@ export default async function UsersPage() {
               <th className="px-4 py-3 font-semibold">Role</th>
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Created At</th>
+              <th className="px-4 py-3 font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -55,6 +59,9 @@ export default async function UsersPage() {
                 <td className="px-4 py-3 text-slate-600">{user.status}</td>
                 <td className="px-4 py-3 text-slate-600">
                   {new Date(user.createdAt).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  <UpdateUserRoleForm userId={user.id} currentRole={user.role} />
                 </td>
               </tr>
             ))}
