@@ -22,6 +22,7 @@ type UpdateFeedbackPayload = {
 
 function getService() {
   return createFeedbackServiceFromPrisma({
+    auditLog: prisma.auditLog,
     feedback: prisma.feedback,
   });
 }
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
 
     const payload = (await request.json()) as CreateFeedbackPayload;
     const result = await getService().createFeedback({
+      actorId: sessionUser.id,
       actorRole: sessionUser.role,
       comments: payload.comments,
       employeeId: payload.employeeId,
@@ -101,6 +103,7 @@ export async function PATCH(request: NextRequest) {
 
     const payload = (await request.json()) as UpdateFeedbackPayload;
     const result = await getService().updateFeedback({
+      actorId: sessionUser.id,
       actorRole: sessionUser.role,
       comments: payload.comments,
       feedbackId: payload.feedbackId,

@@ -17,6 +17,7 @@ const {
     feedbackServiceMock: feedbackService,
     getServerSessionMock: vi.fn(),
     prismaMock: {
+      auditLog: {},
       feedback: {},
     },
   };
@@ -75,9 +76,11 @@ describe("Feedback API", () => {
     const response = await POST(request);
 
     expect(createFeedbackServiceFromPrismaMock).toHaveBeenCalledWith({
+      auditLog: prismaMock.auditLog,
       feedback: prismaMock.feedback,
     });
     expect(feedbackServiceMock.createFeedback).toHaveBeenCalledWith({
+      actorId: "u2",
       actorRole: "SUPERVISOR",
       comments: payload.comments,
       employeeId: payload.employeeId,
@@ -150,6 +153,7 @@ describe("Feedback API", () => {
     const response = await PATCH(request);
 
     expect(feedbackServiceMock.updateFeedback).toHaveBeenCalledWith({
+      actorId: "u-admin",
       actorRole: "ADMIN",
       comments: payload.comments,
       feedbackId: payload.feedbackId,

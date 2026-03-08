@@ -1,4 +1,5 @@
 import type { User, UserRole } from "../../types/user";
+import { createAuditService } from "../audit/audit.service";
 import type {
   CreateUserInput,
   DeactivateUserInput,
@@ -54,6 +55,17 @@ type UserDelegate = {
 };
 
 type UsersServiceDeps = {
+  auditLog: {
+    create: (args: {
+      data: {
+        actorId: string;
+        action: string;
+        entity: string;
+        entityId: string;
+        metadata?: Record<string, unknown>;
+      };
+    }) => Promise<unknown>;
+  };
   user: UserDelegate;
 };
 
@@ -83,6 +95,10 @@ function assertAdmin(actorRole: UserRole): void {
 export function createUsersService(
   deps: UsersServiceDeps,
 ) {
+  const auditService = createAuditService({
+    auditLog: deps.auditLog,
+  });
+
   return {
     async createUser(input: CreateUserInput): Promise<User> {
       const created = await deps.user.create({
@@ -92,6 +108,16 @@ export function createUsersService(
           role: input.role ?? "EMPLOYEE",
         },
         select: userSelect,
+      });
+
+      await auditService.createAuditLog({
+        action: "USER_CREATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: created.id,
+        metadata: {
+          role: created.role,
+        },
       });
 
       return toUser(created);
@@ -121,6 +147,16 @@ export function createUsersService(
         },
       });
 
+      await auditService.createAuditLog({
+        action: "USER_ROLE_UPDATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: input.userId,
+        metadata: {
+          role: input.role,
+        },
+      });
+
       return toUser(updated);
     },
 
@@ -135,6 +171,13 @@ export function createUsersService(
         where: {
           id: input.userId,
         },
+      });
+
+      await auditService.createAuditLog({
+        action: "USER_DEACTIVATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: input.userId,
       });
 
       return toUser(updated);

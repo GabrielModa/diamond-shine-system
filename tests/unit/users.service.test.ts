@@ -7,6 +7,9 @@ import type {
 
 function createPrismaMock() {
   return {
+    auditLog: {
+      create: vi.fn(),
+    },
     user: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -21,6 +24,7 @@ describe("Users service", () => {
     const service = createUsersService(prisma as never);
 
     const input: CreateUserInput = {
+      actorId: "u-admin",
       email: "test@example.com",
     };
 
@@ -47,6 +51,17 @@ describe("Users service", () => {
       },
     });
     expect(result.status).toBe("ACTIVE");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "USER_CREATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: "u1",
+        metadata: {
+          role: "EMPLOYEE",
+        },
+      },
+    });
   });
 
   it("blocks role updates from non-admin users", async () => {
@@ -54,6 +69,7 @@ describe("Users service", () => {
     const service = createUsersService(prisma as never);
 
     const input: UpdateUserRoleInput = {
+      actorId: "u-supervisor",
       actorRole: "SUPERVISOR",
       role: "EMPLOYEE",
       userId: "u1",
@@ -70,6 +86,7 @@ describe("Users service", () => {
     const service = createUsersService(prisma as never);
 
     const input: UpdateUserRoleInput = {
+      actorId: "u-admin",
       actorRole: "ADMIN",
       role: "SUPERVISOR",
       userId: "u1",
@@ -99,6 +116,17 @@ describe("Users service", () => {
       },
     });
     expect(result.role).toBe("SUPERVISOR");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "USER_ROLE_UPDATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: input.userId,
+        metadata: {
+          role: input.role,
+        },
+      },
+    });
   });
 
   it("deactivates a user as viewer", async () => {
@@ -106,6 +134,7 @@ describe("Users service", () => {
     const service = createUsersService(prisma as never);
 
     const input: DeactivateUserInput = {
+      actorId: "u-admin",
       actorRole: "ADMIN",
       userId: "u1",
     };
@@ -134,6 +163,14 @@ describe("Users service", () => {
       },
     });
     expect(result.status).toBe("INACTIVE");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "USER_DEACTIVATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: input.userId,
+      },
+    });
   });
 
   it("lists users and maps status from role", async () => {

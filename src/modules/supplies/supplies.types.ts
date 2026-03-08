@@ -1,6 +1,7 @@
 import type { UserRole } from "../../types/user";
 
 export type CreateSupplyRequestInput = {
+  actorId: string;
   actorRole: UserRole;
   item: string;
   quantity: number;
@@ -15,11 +16,13 @@ export type ListSupplyRequestsInput = {
 };
 
 export type ApproveRequestInput = {
+  actorId: string;
   actorRole: UserRole;
   requestId: string;
 };
 
 export type RejectRequestInput = {
+  actorId: string;
   actorRole: UserRole;
   requestId: string;
 };

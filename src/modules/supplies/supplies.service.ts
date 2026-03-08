@@ -1,5 +1,6 @@
 import type { Supply, SupplyStatus } from "../../types/supply";
 import type { UserRole } from "../../types/user";
+import { createAuditService } from "../audit/audit.service";
 import type {
   ApproveRequestInput,
   CreateSupplyRequestInput,
@@ -74,6 +75,17 @@ type SupplyRequestDelegate = {
 };
 
 type SuppliesServiceDeps = {
+  auditLog: {
+    create: (args: {
+      data: {
+        actorId: string;
+        action: string;
+        entity: string;
+        entityId: string;
+        metadata?: Record<string, unknown>;
+      };
+    }) => Promise<unknown>;
+  };
   supplyRequest: SupplyRequestDelegate;
 };
 
@@ -143,6 +155,10 @@ function buildListWhere(input: ListSupplyRequestsInput): {
 export function createSuppliesService(
   deps: SuppliesServiceDeps,
 ) {
+  const auditService = createAuditService({
+    auditLog: deps.auditLog,
+  });
+
   return {
     async createSupplyRequest(input: CreateSupplyRequestInput): Promise<Supply> {
       assertCanCreate(input.actorRole);
@@ -156,6 +172,17 @@ export function createSuppliesService(
           status: "PENDING",
         },
         select: supplySelect,
+      });
+
+      await auditService.createAuditLog({
+        action: "SUPPLY_REQUEST_CREATED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: created.id,
+        metadata: {
+          department: created.department,
+          quantity: created.quantity,
+        },
       });
 
       return toSupply(created);
@@ -186,6 +213,13 @@ export function createSuppliesService(
         },
       });
 
+      await auditService.createAuditLog({
+        action: "SUPPLY_APPROVED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: input.requestId,
+      });
+
       return toSupply(updated);
     },
 
@@ -200,6 +234,13 @@ export function createSuppliesService(
         where: {
           id: input.requestId,
         },
+      });
+
+      await auditService.createAuditLog({
+        action: "SUPPLY_REJECTED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: input.requestId,
       });
 
       return toSupply(updated);

@@ -7,6 +7,9 @@ import type {
 
 function createPrismaMock() {
   return {
+    auditLog: {
+      create: vi.fn(),
+    },
     feedback: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -21,6 +24,7 @@ describe("Feedback service", () => {
     const service = createFeedbackService(prisma as never);
 
     const input: CreateFeedbackInput = {
+      actorId: "u-supervisor",
       actorRole: "SUPERVISOR",
       comments: "Strong performance this sprint.",
       employeeId: "u-employee",
@@ -56,6 +60,18 @@ describe("Feedback service", () => {
       },
     });
     expect(result.score).toBe(9);
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "FEEDBACK_CREATED",
+        actorId: input.actorId,
+        entity: "Feedback",
+        entityId: "f1",
+        metadata: {
+          employeeId: input.employeeId,
+          score: input.score,
+        },
+      },
+    });
   });
 
   it("blocks feedback creation for employees", async () => {
@@ -63,6 +79,7 @@ describe("Feedback service", () => {
     const service = createFeedbackService(prisma as never);
 
     const input: CreateFeedbackInput = {
+      actorId: "u-employee",
       actorRole: "EMPLOYEE",
       comments: "Strong performance this sprint.",
       employeeId: "u-employee",
@@ -140,6 +157,7 @@ describe("Feedback service", () => {
     const service = createFeedbackService(prisma as never);
 
     const input: UpdateFeedbackInput = {
+      actorId: "u-admin",
       actorRole: "ADMIN",
       comments: "Updated comments.",
       feedbackId: "f1",
@@ -175,6 +193,17 @@ describe("Feedback service", () => {
       },
     });
     expect(result.comments).toBe("Updated comments.");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "FEEDBACK_UPDATED",
+        actorId: input.actorId,
+        entity: "Feedback",
+        entityId: input.feedbackId,
+        metadata: {
+          score: input.score,
+        },
+      },
+    });
   });
 
   it("blocks feedback update for viewers", async () => {
@@ -182,6 +211,7 @@ describe("Feedback service", () => {
     const service = createFeedbackService(prisma as never);
 
     const input: UpdateFeedbackInput = {
+      actorId: "u-viewer",
       actorRole: "VIEWER",
       comments: "Updated comments.",
       feedbackId: "f1",

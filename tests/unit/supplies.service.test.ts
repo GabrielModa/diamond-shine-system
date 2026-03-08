@@ -8,6 +8,9 @@ import type {
 
 function createPrismaMock() {
   return {
+    auditLog: {
+      create: vi.fn(),
+    },
     supplyRequest: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -22,6 +25,7 @@ describe("Supplies service", () => {
     const service = createSuppliesService(prisma as never);
 
     const input: CreateSupplyRequestInput = {
+      actorId: "u1",
       actorRole: "EMPLOYEE",
       department: "Operations",
       item: "Gloves",
@@ -60,6 +64,18 @@ describe("Supplies service", () => {
       },
     });
     expect(result.status).toBe("PENDING");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "SUPPLY_REQUEST_CREATED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: "r1",
+        metadata: {
+          department: input.department,
+          quantity: input.quantity,
+        },
+      },
+    });
   });
 
   it("blocks supply request creation for supervisor", async () => {
@@ -67,6 +83,7 @@ describe("Supplies service", () => {
     const service = createSuppliesService(prisma as never);
 
     const input: CreateSupplyRequestInput = {
+      actorId: "u2",
       actorRole: "SUPERVISOR",
       department: "Operations",
       item: "Gloves",
@@ -178,6 +195,7 @@ describe("Supplies service", () => {
     const service = createSuppliesService(prisma as never);
 
     const input: ApproveRequestInput = {
+      actorId: "u2",
       actorRole: "EMPLOYEE",
       requestId: "r1",
     };
@@ -193,6 +211,7 @@ describe("Supplies service", () => {
     const service = createSuppliesService(prisma as never);
 
     const input: ApproveRequestInput = {
+      actorId: "u2",
       actorRole: "SUPERVISOR",
       requestId: "r1",
     };
@@ -227,6 +246,14 @@ describe("Supplies service", () => {
       },
     });
     expect(result.status).toBe("APPROVED");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "SUPPLY_APPROVED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: input.requestId,
+      },
+    });
   });
 
   it("rejects request as admin", async () => {
@@ -234,6 +261,7 @@ describe("Supplies service", () => {
     const service = createSuppliesService(prisma as never);
 
     const input: RejectRequestInput = {
+      actorId: "u-admin",
       actorRole: "ADMIN",
       requestId: "r1",
     };
@@ -268,5 +296,13 @@ describe("Supplies service", () => {
       },
     });
     expect(result.status).toBe("REJECTED");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "SUPPLY_REJECTED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: input.requestId,
+      },
+    });
   });
 });

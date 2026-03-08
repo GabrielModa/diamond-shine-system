@@ -19,6 +19,7 @@ type CreateSupplyPayload = {
 
 function getService() {
   return createSuppliesServiceFromPrisma({
+    auditLog: prisma.auditLog,
     supplyRequest: prisma.supplyRequest,
   });
 }
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest) {
 
     const payload = (await request.json()) as CreateSupplyPayload;
     const result = await getService().createSupplyRequest({
+      actorId: sessionUser.id,
       actorRole: sessionUser.role,
       department: payload.department,
       item: payload.item,
@@ -100,6 +102,7 @@ export async function PATCH(request: NextRequest) {
 
     if (payload.action === "approve") {
       const result = await getService().approveRequest({
+        actorId: sessionUser.id,
         actorRole: sessionUser.role,
         requestId: payload.requestId,
       });
@@ -108,6 +111,7 @@ export async function PATCH(request: NextRequest) {
 
     if (payload.action === "reject") {
       const result = await getService().rejectRequest({
+        actorId: sessionUser.id,
         actorRole: sessionUser.role,
         requestId: payload.requestId,
       });
