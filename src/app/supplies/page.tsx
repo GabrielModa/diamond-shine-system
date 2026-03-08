@@ -39,7 +39,7 @@ export default async function SuppliesPage() {
   const supplies = await getSupplies();
 
   return (
-    <DashboardLayout title="Supplies">
+    <DashboardLayout currentPath="/supplies" title="Supplies">
       <CreateSupplyForm />
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">

@@ -38,7 +38,7 @@ export default async function FeedbackPage() {
   const feedback = await getFeedbackRecords();
 
   return (
-    <DashboardLayout title="Feedback">
+    <DashboardLayout currentPath="/feedback" title="Feedback">
       <CreateFeedbackForm />
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">

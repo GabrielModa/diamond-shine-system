@@ -38,7 +38,7 @@ export default async function UsersPage() {
   const users = await getUsers();
 
   return (
-    <DashboardLayout title="Users">
+    <DashboardLayout currentPath="/users" title="Users">
       <CreateUserForm />
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">

@@ -2,18 +2,29 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { authOptions } from "@/src/lib/auth";
+import { getSidebarLinks } from "@/src/lib/permissions";
+import type { UserRole } from "@/src/types/user";
 import { Sidebar } from "./Sidebar";
 
 type DashboardLayoutProps = {
   children: ReactNode;
+  currentPath: "/dashboard" | "/users" | "/supplies" | "/feedback";
   title: string;
 };
 
-export async function DashboardLayout({ children, title }: DashboardLayoutProps) {
+export async function DashboardLayout({ children, currentPath, title }: DashboardLayoutProps) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
     redirect("/api/auth/signin");
+  }
+
+  const role = (session.user.role as UserRole | undefined) ?? "VIEWER";
+  const allowedLinks = getSidebarLinks(role);
+  const canAccessCurrentPage = allowedLinks.some((link) => link.href === currentPath);
+
+  if (!canAccessCurrentPage) {
+    redirect("/dashboard");
   }
 
   return (

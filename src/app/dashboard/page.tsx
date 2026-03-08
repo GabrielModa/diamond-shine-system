@@ -21,7 +21,7 @@ const CARDS = [
 
 export default async function DashboardPage() {
   return (
-    <DashboardLayout title="Dashboard">
+    <DashboardLayout currentPath="/dashboard" title="Dashboard">
       <section className="grid gap-4 md:grid-cols-3">
         {CARDS.map((card) => (
           <Link
