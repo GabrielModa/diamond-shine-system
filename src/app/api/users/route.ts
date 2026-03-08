@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
+import { checkRateLimit } from "../../../lib/security/rateLimit";
+import { SchemaValidationError, validateSchema } from "../../../lib/security/validate";
+import {
+  createUserSchema,
+  patchUserSchema,
+} from "../../../lib/validation/user.schema";
 import { createUsersServiceFromPrisma } from "../../../modules/users/users.service";
 import type { CreateUserInput } from "../../../modules/users/users.types";
 import type { UserRole } from "../../../types/user";
@@ -31,8 +37,33 @@ function getService() {
 }
 
 function toErrorResponse(error: unknown): NextResponse {
+  if (error instanceof SchemaValidationError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+
   const message = error instanceof Error ? error.message : "Unexpected error.";
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+function getRateLimitResponse(request: NextRequest | undefined): NextResponse | null {
+  const ip = request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const result = checkRateLimit({
+    key: `users:${ip}`,
+  });
+
+  if (result.allowed) {
+    return null;
+  }
+
+  return NextResponse.json(
+    { error: "Too many requests. Please try again later." },
+    {
+      headers: {
+        "Retry-After": String(result.retryAfterSeconds),
+      },
+      status: 429,
+    },
+  );
 }
 
 async function getSessionUser(): Promise<{ id: string; role: UserRole } | null> {
@@ -49,8 +80,13 @@ async function getSessionUser(): Promise<{ id: string; role: UserRole } | null> 
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const rateLimitResponse = getRateLimitResponse(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -65,12 +101,17 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResponse = getRateLimitResponse(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const payload = (await request.json()) as CreateUserPayload;
+    const payload = validateSchema<CreateUserPayload>(createUserSchema, await request.json());
     const result = await getService().createUser({
       ...payload,
       actorId: sessionUser.id,
@@ -83,12 +124,20 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const rateLimitResponse = getRateLimitResponse(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const payload = (await request.json()) as UpdateRolePayload | DeactivateUserPayload;
+    const payload = validateSchema<UpdateRolePayload | DeactivateUserPayload>(
+      patchUserSchema,
+      await request.json(),
+    );
 
     if (payload.action === "deactivate") {
       const result = await getService().deactivateUser({
