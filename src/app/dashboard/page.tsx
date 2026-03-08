@@ -1,5 +1,12 @@
 import Link from "next/link";
+import { getServerSession } from "next-auth";
+import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
+import { authOptions } from "@/src/lib/auth";
+import { FeedbackChart } from "@/src/components/metrics/FeedbackChart";
+import { MetricsCards } from "@/src/components/metrics/MetricsCards";
+import { SuppliesChart } from "@/src/components/metrics/SuppliesChart";
+import type { UserRole } from "@/src/types/user";
 
 const CARDS = [
   {
@@ -19,9 +26,63 @@ const CARDS = [
   },
 ];
 
+type DashboardMetrics = {
+  totalUsers: number;
+  activeUsers: number;
+  pendingSupplies: number;
+  approvedSupplies: number;
+  rejectedSupplies: number;
+  totalFeedback: number;
+  averageFeedbackScore: number;
+  suppliesByDepartment: Array<{ department: string; count: number }>;
+  feedbackScoreTrend: Array<{ date: string; averageScore: number }>;
+};
+
+async function getDashboardMetrics(): Promise<DashboardMetrics> {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+
+  if (!host) {
+    throw new Error("Unable to resolve request host.");
+  }
+
+  const response = await fetch(`${protocol}://${host}/api/metrics`, {
+    cache: "no-store",
+    headers: {
+      cookie: requestHeaders.get("cookie") ?? "",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load metrics.");
+  }
+
+  return (await response.json()) as DashboardMetrics;
+}
+
 export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
+  const role = (session?.user?.role as UserRole | undefined) ?? "VIEWER";
+  const canAccessMetrics = role === "ADMIN" || role === "SUPERVISOR";
+  const metrics = canAccessMetrics ? await getDashboardMetrics() : null;
+
   return (
     <DashboardLayout currentPath="/dashboard" title="Dashboard">
+      {metrics ? (
+        <>
+          <MetricsCards
+            averageFeedbackScore={metrics.averageFeedbackScore}
+            pendingSupplies={metrics.pendingSupplies}
+            totalFeedback={metrics.totalFeedback}
+            totalUsers={metrics.totalUsers}
+          />
+          <section className="mb-6 grid gap-4 lg:grid-cols-2">
+            <SuppliesChart data={metrics.suppliesByDepartment} />
+            <FeedbackChart data={metrics.feedbackScoreTrend} />
+          </section>
+        </>
+      ) : null}
       <section className="grid gap-4 md:grid-cols-3">
         {CARDS.map((card) => (
           <Link
