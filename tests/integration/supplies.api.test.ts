@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 const {
   createSuppliesServiceFromPrismaMock,
+  getServerSessionMock,
   prismaMock,
   suppliesServiceMock,
 } = vi.hoisted(() => {
@@ -14,6 +15,7 @@ const {
 
   return {
     createSuppliesServiceFromPrismaMock: vi.fn(() => suppliesService),
+    getServerSessionMock: vi.fn(),
     prismaMock: {
       supplyRequest: {},
     },
@@ -29,20 +31,29 @@ vi.mock("../../src/modules/supplies/supplies.service", () => ({
   createSuppliesServiceFromPrisma: createSuppliesServiceFromPrismaMock,
 }));
 
+vi.mock("next-auth", () => ({
+  getServerSession: getServerSessionMock,
+}));
+
 import { GET, PATCH, POST } from "../../src/app/api/supplies/route";
 
 describe("Supplies API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        email: "employee@example.com",
+        id: "u1",
+        role: "EMPLOYEE",
+      },
+    });
   });
 
   it("POST /api/supplies creates a request", async () => {
     const payload = {
-      actorRole: "EMPLOYEE",
       department: "Operations",
       item: "Gloves",
       quantity: 10,
-      requesterId: "u1",
     };
 
     suppliesServiceMock.createSupplyRequest.mockResolvedValue({
@@ -68,7 +79,13 @@ describe("Supplies API", () => {
     expect(createSuppliesServiceFromPrismaMock).toHaveBeenCalledWith({
       supplyRequest: prismaMock.supplyRequest,
     });
-    expect(suppliesServiceMock.createSupplyRequest).toHaveBeenCalledWith(payload);
+    expect(suppliesServiceMock.createSupplyRequest).toHaveBeenCalledWith({
+      actorRole: "EMPLOYEE",
+      department: payload.department,
+      item: payload.item,
+      quantity: payload.quantity,
+      requesterId: "u1",
+    });
     expect(response.status).toBe(201);
   });
 
@@ -76,7 +93,7 @@ describe("Supplies API", () => {
     suppliesServiceMock.listSupplyRequests.mockResolvedValue([]);
 
     const request = new NextRequest(
-      "http://localhost/api/supplies?actorRole=EMPLOYEE&requesterId=u1",
+      "http://localhost/api/supplies?requesterId=another-user",
       {
         method: "GET",
       },
@@ -95,9 +112,16 @@ describe("Supplies API", () => {
   it("PATCH /api/supplies rejects a request", async () => {
     const payload = {
       action: "reject",
-      actorRole: "SUPERVISOR",
       requestId: "r1",
     } as const;
+
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        email: "supervisor@example.com",
+        id: "u-supervisor",
+        role: "SUPERVISOR",
+      },
+    });
 
     suppliesServiceMock.rejectRequest.mockResolvedValue({
       department: "Operations",
@@ -124,5 +148,18 @@ describe("Supplies API", () => {
       requestId: "r1",
     });
     expect(response.status).toBe(200);
+  });
+
+  it("returns 401 when session does not exist", async () => {
+    getServerSessionMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/supplies", {
+        method: "GET",
+      }),
+    );
+
+    expect(suppliesServiceMock.listSupplyRequests).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
   });
 });

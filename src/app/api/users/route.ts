@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { createUsersServiceFromPrisma } from "../../../modules/users/users.service";
-import type { CreateUserInput, UpdateUserRoleInput } from "../../../modules/users/users.types";
+import type { CreateUserInput } from "../../../modules/users/users.types";
 import type { UserRole } from "../../../types/user";
 
 type DeactivateUserPayload = {
   action: "deactivate";
-  actorRole: UserRole;
   userId: string;
 };
 
-type UpdateRolePayload = UpdateUserRoleInput & {
+type UpdateRolePayload = {
   action: "updateRole";
+  role: UserRole;
+  userId: string;
 };
 
 function getService() {
@@ -25,8 +28,18 @@ function toErrorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
+async function getAuthenticatedRole(): Promise<UserRole | null> {
+  const session = await getServerSession(authOptions);
+  return (session?.user as { role?: UserRole } | undefined)?.role ?? null;
+}
+
 export async function GET() {
   try {
+    const actorRole = await getAuthenticatedRole();
+    if (!actorRole) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const result = await getService().listUsers();
     return NextResponse.json(result);
   } catch (error) {
@@ -36,6 +49,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const sessionRole = await getAuthenticatedRole();
+    if (!sessionRole) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const payload = (await request.json()) as CreateUserInput;
     const result = await getService().createUser(payload);
     return NextResponse.json(result, { status: 201 });
@@ -46,11 +64,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const sessionRole = await getAuthenticatedRole();
+    if (!sessionRole) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const payload = (await request.json()) as UpdateRolePayload | DeactivateUserPayload;
 
     if (payload.action === "deactivate") {
       const result = await getService().deactivateUser({
-        actorRole: payload.actorRole,
+        actorRole: sessionRole,
         userId: payload.userId,
       });
       return NextResponse.json(result);
@@ -58,7 +81,7 @@ export async function PATCH(request: NextRequest) {
 
     if (payload.action === "updateRole") {
       const result = await getService().updateUserRole({
-        actorRole: payload.actorRole,
+        actorRole: sessionRole,
         role: payload.role,
         userId: payload.userId,
       });
