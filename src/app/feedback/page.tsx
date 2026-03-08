@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
+import { CreateFeedbackForm } from "@/src/components/forms/CreateFeedbackForm";
 
 type FeedbackRow = {
   id: string;
@@ -38,6 +39,7 @@ export default async function FeedbackPage() {
 
   return (
     <DashboardLayout title="Feedback">
+      <CreateFeedbackForm />
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-600">
