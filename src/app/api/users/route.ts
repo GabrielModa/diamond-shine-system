@@ -17,8 +17,15 @@ type UpdateRolePayload = {
   userId: string;
 };
 
+type CreateUserPayload = {
+  email: string;
+  provider?: "LOCAL" | "GOOGLE";
+  role?: UserRole;
+};
+
 function getService() {
   return createUsersServiceFromPrisma({
+    auditLog: prisma.auditLog,
     user: prisma.user,
   });
 }
@@ -28,15 +35,24 @@ function toErrorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
-async function getAuthenticatedRole(): Promise<UserRole | null> {
+async function getSessionUser(): Promise<{ id: string; role: UserRole } | null> {
   const session = await getServerSession(authOptions);
-  return (session?.user as { role?: UserRole } | undefined)?.role ?? null;
+  const user = session?.user as { id?: string; role?: UserRole } | undefined;
+
+  if (!user?.id || !user.role) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    role: user.role,
+  };
 }
 
 export async function GET() {
   try {
-    const actorRole = await getAuthenticatedRole();
-    if (!actorRole) {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -49,13 +65,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const sessionRole = await getAuthenticatedRole();
-    if (!sessionRole) {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const payload = (await request.json()) as CreateUserInput;
-    const result = await getService().createUser(payload);
+    const payload = (await request.json()) as CreateUserPayload;
+    const result = await getService().createUser({
+      ...payload,
+      actorId: sessionUser.id,
+    } as CreateUserInput);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     return toErrorResponse(error);
@@ -64,8 +83,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const sessionRole = await getAuthenticatedRole();
-    if (!sessionRole) {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -73,7 +92,8 @@ export async function PATCH(request: NextRequest) {
 
     if (payload.action === "deactivate") {
       const result = await getService().deactivateUser({
-        actorRole: sessionRole,
+        actorId: sessionUser.id,
+        actorRole: sessionUser.role,
         userId: payload.userId,
       });
       return NextResponse.json(result);
@@ -81,7 +101,8 @@ export async function PATCH(request: NextRequest) {
 
     if (payload.action === "updateRole") {
       const result = await getService().updateUserRole({
-        actorRole: sessionRole,
+        actorId: sessionUser.id,
+        actorRole: sessionUser.role,
         role: payload.role,
         userId: payload.userId,
       });

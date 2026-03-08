@@ -17,6 +17,7 @@ const {
     createUsersServiceFromPrismaMock: vi.fn(() => usersService),
     getServerSessionMock: vi.fn(),
     prismaMock: {
+      auditLog: {},
       user: {},
     },
     usersServiceMock: usersService,
@@ -74,9 +75,13 @@ describe("Users API", () => {
     const response = await POST(request);
 
     expect(createUsersServiceFromPrismaMock).toHaveBeenCalledWith({
+      auditLog: prismaMock.auditLog,
       user: prismaMock.user,
     });
-    expect(usersServiceMock.createUser).toHaveBeenCalledWith(payload);
+    expect(usersServiceMock.createUser).toHaveBeenCalledWith({
+      ...payload,
+      actorId: "u-admin",
+    });
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({
       email: payload.email,
@@ -128,6 +133,7 @@ describe("Users API", () => {
     const response = await PATCH(request);
 
     expect(usersServiceMock.updateUserRole).toHaveBeenCalledWith({
+      actorId: "u-admin",
       actorRole: "ADMIN",
       role: "SUPERVISOR",
       userId: "u1",

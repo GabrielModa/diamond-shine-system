@@ -1,5 +1,6 @@
 import type { Feedback } from "../../types/feedback";
 import type { UserRole } from "../../types/user";
+import { createAuditService } from "../audit/audit.service";
 import type {
   CreateFeedbackInput,
   ListFeedbackInput,
@@ -69,6 +70,17 @@ type FeedbackDelegate = {
 };
 
 type FeedbackServiceDeps = {
+  auditLog: {
+    create: (args: {
+      data: {
+        actorId: string;
+        action: string;
+        entity: string;
+        entityId: string;
+        metadata?: Record<string, unknown>;
+      };
+    }) => Promise<unknown>;
+  };
   feedback: FeedbackDelegate;
 };
 
@@ -130,6 +142,10 @@ function buildListWhere(input: ListFeedbackInput): {
 export function createFeedbackService(
   deps: FeedbackServiceDeps,
 ) {
+  const auditService = createAuditService({
+    auditLog: deps.auditLog,
+  });
+
   return {
     async createFeedback(input: CreateFeedbackInput): Promise<Feedback> {
       assertCanCreateOrUpdate(input.actorRole, "create");
@@ -142,6 +158,17 @@ export function createFeedbackService(
           score: input.score,
         },
         select: feedbackSelect,
+      });
+
+      await auditService.createAuditLog({
+        action: "FEEDBACK_CREATED",
+        actorId: input.actorId,
+        entity: "Feedback",
+        entityId: created.id,
+        metadata: {
+          employeeId: input.employeeId,
+          score: input.score,
+        },
       });
 
       return toFeedback(created);
@@ -170,6 +197,16 @@ export function createFeedbackService(
         select: feedbackSelect,
         where: {
           id: input.feedbackId,
+        },
+      });
+
+      await auditService.createAuditLog({
+        action: "FEEDBACK_UPDATED",
+        actorId: input.actorId,
+        entity: "Feedback",
+        entityId: input.feedbackId,
+        metadata: {
+          score: input.score,
         },
       });
 

@@ -17,6 +17,7 @@ const {
     createSuppliesServiceFromPrismaMock: vi.fn(() => suppliesService),
     getServerSessionMock: vi.fn(),
     prismaMock: {
+      auditLog: {},
       supplyRequest: {},
     },
     suppliesServiceMock: suppliesService,
@@ -77,9 +78,11 @@ describe("Supplies API", () => {
     const response = await POST(request);
 
     expect(createSuppliesServiceFromPrismaMock).toHaveBeenCalledWith({
+      auditLog: prismaMock.auditLog,
       supplyRequest: prismaMock.supplyRequest,
     });
     expect(suppliesServiceMock.createSupplyRequest).toHaveBeenCalledWith({
+      actorId: "u1",
       actorRole: "EMPLOYEE",
       department: payload.department,
       item: payload.item,
@@ -144,6 +147,7 @@ describe("Supplies API", () => {
     const response = await PATCH(request);
 
     expect(suppliesServiceMock.rejectRequest).toHaveBeenCalledWith({
+      actorId: "u-supervisor",
       actorRole: "SUPERVISOR",
       requestId: "r1",
     });
