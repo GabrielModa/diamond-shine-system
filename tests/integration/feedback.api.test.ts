@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 const {
   createFeedbackServiceFromPrismaMock,
   feedbackServiceMock,
+  getServerSessionMock,
   prismaMock,
 } = vi.hoisted(() => {
   const feedbackService = {
@@ -14,6 +15,7 @@ const {
   return {
     createFeedbackServiceFromPrismaMock: vi.fn(() => feedbackService),
     feedbackServiceMock: feedbackService,
+    getServerSessionMock: vi.fn(),
     prismaMock: {
       feedback: {},
     },
@@ -28,19 +30,28 @@ vi.mock("../../src/modules/feedback/feedback.service", () => ({
   createFeedbackServiceFromPrisma: createFeedbackServiceFromPrismaMock,
 }));
 
+vi.mock("next-auth", () => ({
+  getServerSession: getServerSessionMock,
+}));
+
 import { GET, PATCH, POST } from "../../src/app/api/feedback/route";
 
 describe("Feedback API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        email: "supervisor@example.com",
+        id: "u2",
+        role: "SUPERVISOR",
+      },
+    });
   });
 
   it("POST /api/feedback creates feedback", async () => {
     const payload = {
-      actorRole: "SUPERVISOR",
       comments: "Consistent quality of work.",
       employeeId: "u1",
-      reviewerId: "u2",
       score: 9,
     };
 
@@ -66,7 +77,13 @@ describe("Feedback API", () => {
     expect(createFeedbackServiceFromPrismaMock).toHaveBeenCalledWith({
       feedback: prismaMock.feedback,
     });
-    expect(feedbackServiceMock.createFeedback).toHaveBeenCalledWith(payload);
+    expect(feedbackServiceMock.createFeedback).toHaveBeenCalledWith({
+      actorRole: "SUPERVISOR",
+      comments: payload.comments,
+      employeeId: payload.employeeId,
+      reviewerId: "u2",
+      score: payload.score,
+    });
     expect(response.status).toBe(201);
   });
 
@@ -74,11 +91,19 @@ describe("Feedback API", () => {
     feedbackServiceMock.listFeedback.mockResolvedValue([]);
 
     const request = new NextRequest(
-      "http://localhost/api/feedback?actorRole=EMPLOYEE&employeeId=u1",
+      "http://localhost/api/feedback?employeeId=another-user",
       {
         method: "GET",
       },
     );
+
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        email: "employee@example.com",
+        id: "u1",
+        role: "EMPLOYEE",
+      },
+    });
 
     const response = await GET(request);
 
@@ -92,11 +117,18 @@ describe("Feedback API", () => {
 
   it("PATCH /api/feedback updates feedback", async () => {
     const payload = {
-      actorRole: "ADMIN",
       comments: "Updated review.",
       feedbackId: "f1",
       score: 8,
     };
+
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        email: "admin@example.com",
+        id: "u-admin",
+        role: "ADMIN",
+      },
+    });
 
     feedbackServiceMock.updateFeedback.mockResolvedValue({
       comments: payload.comments,
@@ -117,7 +149,25 @@ describe("Feedback API", () => {
 
     const response = await PATCH(request);
 
-    expect(feedbackServiceMock.updateFeedback).toHaveBeenCalledWith(payload);
+    expect(feedbackServiceMock.updateFeedback).toHaveBeenCalledWith({
+      actorRole: "ADMIN",
+      comments: payload.comments,
+      feedbackId: payload.feedbackId,
+      score: payload.score,
+    });
     expect(response.status).toBe(200);
+  });
+
+  it("returns 401 when session does not exist", async () => {
+    getServerSessionMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/feedback", {
+        method: "GET",
+      }),
+    );
+
+    expect(feedbackServiceMock.listFeedback).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
   });
 });

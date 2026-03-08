@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 const {
   createUsersServiceFromPrismaMock,
+  getServerSessionMock,
   prismaMock,
   usersServiceMock,
 } = vi.hoisted(() => {
@@ -14,6 +15,7 @@ const {
 
   return {
     createUsersServiceFromPrismaMock: vi.fn(() => usersService),
+    getServerSessionMock: vi.fn(),
     prismaMock: {
       user: {},
     },
@@ -29,11 +31,22 @@ vi.mock("../../src/modules/users/users.service", () => ({
   createUsersServiceFromPrisma: createUsersServiceFromPrismaMock,
 }));
 
+vi.mock("next-auth", () => ({
+  getServerSession: getServerSessionMock,
+}));
+
 import { GET, PATCH, POST } from "../../src/app/api/users/route";
 
 describe("Users API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        email: "admin@example.com",
+        id: "u-admin",
+        role: "ADMIN",
+      },
+    });
   });
 
   it("POST /api/users creates a user", async () => {
@@ -92,7 +105,6 @@ describe("Users API", () => {
   it("PATCH /api/users updates role", async () => {
     const payload = {
       action: "updateRole",
-      actorRole: "ADMIN",
       role: "SUPERVISOR",
       userId: "u1",
     } as const;
@@ -121,5 +133,17 @@ describe("Users API", () => {
       userId: "u1",
     });
     expect(response.status).toBe(200);
+  });
+
+  it("returns 401 when session does not exist", async () => {
+    getServerSessionMock.mockResolvedValue(null);
+
+    const response = await GET();
+
+    expect(usersServiceMock.listUsers).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Unauthorized",
+    });
   });
 });
