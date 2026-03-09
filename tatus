@@ -1,0 +1,48 @@
+*   [33m14cb16a[m[33m ([m[1;32mfeat/protect-api-routes[m[33m)[m fix: resolve auth.ts merge conflict
+[31m|[m[32m\[m  
+[31m|[m [32m|[m * [33m756784d[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #11 from GabrielModa/feat/protect-api-routes
+[31m|[m [32m|[m[32m/[m[34m|[m 
+[31m|[m [32m|[m * [33m5cd1649[m[33m ([m[1;31morigin/feat/protect-api-routes[m[33m)[m Merge branch 'main' into feat/protect-api-routes
+[31m|[m [32m|[m[31m/[m[32m|[m 
+[31m|[m[31m/[m[32m|[m[32m/[m  
+[31m|[m *   [33m470bc57[m Merge pull request #10 from GabrielModa/feat/authentication-layer
+[31m|[m [1;31m|[m[1;32m\[m  
+[31m|[m [1;31m|[m * [33m0d79233[m[33m ([m[1;31morigin/feat/authentication-layer[m[33m, [m[1;32mfeat/authentication-layer[m[33m)[m feat:authentication-layer
+[31m|[m * [1;32m|[m   [33m23d20cc[m Merge pull request #9 from GabrielModa/feat/api-layer
+[31m|[m [1;33m|[m[1;34m\[m [1;32m\[m  
+[31m|[m * [1;34m\[m [1;32m\[m   [33m9addc14[m Merge pull request #8 from GabrielModa/feature/feedback-module
+[31m|[m [1;35m|[m[1;36m\[m [1;34m\[m [1;32m\[m  
+* [1;35m|[m [1;36m|[m [1;34m|[m [1;32m|[m [33m1b0571f[m feat:protect-api-routes
+[1;34m|[m [1;35m|[m[1;34m_[m[1;36m|[m[1;34m/[m [1;32m/[m  
+[1;34m|[m[1;34m/[m[1;35m|[m [1;36m|[m [1;32m|[m   
+* [1;35m|[m [1;36m|[m [1;32m|[m [33m92c296d[m[33m ([m[1;31morigin/feat/api-layer[m[33m, [m[1;32mfeat/api-layer[m[33m)[m feat:api-layer
+[1;36m|[m [1;35m|[m[1;36m/[m [1;32m/[m  
+[1;36m|[m[1;36m/[m[1;35m|[m [1;32m|[m   
+* [1;35m|[m [1;32m|[m [33m9441ba3[m[33m ([m[1;31morigin/feature/feedback-module[m[33m, [m[1;32mfeature/feedback-module[m[33m)[m feat:feedback-module
+[1;32m|[m [1;35m|[m[1;32m/[m  
+[1;32m|[m[1;32m/[m[1;35m|[m   
+* [1;35m|[m   [33m7745611[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m Merge pull request #7 from GabrielModa/docs/architecture
+[1;35m|[m[32m\[m [1;35m\[m  
+[1;35m|[m [32m|[m[1;35m/[m  
+[1;35m|[m[1;35m/[m[32m|[m   
+[1;35m|[m * [33mb7ecdf6[m[33m ([m[1;31morigin/docs/architecture[m[33m, [m[1;32mdocs/architecture[m[33m)[m docs:add-architecture-guide
+[1;35m|[m[1;35m/[m  
+*   [33mf9ffefd[m[33m ([m[1;32mmain[m[33m)[m Merge pull request #5 from GabrielModa/chore/pr-rules
+[33m|[m[34m\[m  
+[33m|[m * [33m5785845[m[33m ([m[1;31morigin/chore/pr-rules[m[33m, [m[1;32mchore/pr-rules[m[33m)[m docs:add-pr-rules
+* [34m|[m [33mfb2a940[m Merge pull request #4 from GabrielModa/feature/supplies-module
+[35m|[m[34m\[m[34m|[m 
+[35m|[m * [33mda37e02[m[33m ([m[1;31morigin/feature/supplies-module[m[33m, [m[1;32mfeature/supplies-module[m[33m)[m feat:add-supplies-domain-module
+* [36m|[m [33mcc65d19[m Merge pull request #3 from GabrielModa/feature/users-module
+[1;31m|[m[36m\[m[36m|[m 
+[1;31m|[m * [33mea00f76[m[33m ([m[1;31morigin/feature/users-module[m[33m, [m[1;32mfeature/users-module[m[33m)[m feat:users-module
+[1;31m|[m[1;31m/[m  
+*   [33mf240a39[m[33m ([m[1;31morigin/refactor/typed-permissions[m[33m, [m[1;32mrefactor/typed-permissions[m[33m)[m Merge pull request #2 from GabrielModa/refactor/typed-permissions
+[1;33m|[m[1;34m\[m  
+[1;33m|[m * [33m6c4095f[m refactor:typed-permissions
+[1;33m|[m * [33mf73423c[m[33m ([m[1;31morigin/refactor/architecture-structure[m[33m, [m[1;32mrefactor/architecture-structure[m[33m)[m refactor:architecture-structure
+[1;33m|[m[1;33m/[m  
+* [33m08edcca[m docs: enforce pull request workflow for AI agents
+* [33mecd9bd8[m docs: add AGENTS guidelines for AI coding agents
+* [33m63b7cb4[m docs: add feature specifications for authentication, users, supplies, feedback and dashboard
+* [33m7979ba6[m docs: add project readme and system architecture documentation
