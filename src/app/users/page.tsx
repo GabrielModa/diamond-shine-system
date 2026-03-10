@@ -1,10 +1,8 @@
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
 import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
 import { SubmitButton } from "@/src/components/dashboard/SubmitButton";
-import { authOptions } from "@/src/lib/auth";
-import type { UserRole } from "@/src/types/user";
+import { requireAuthenticatedRoute } from "@/src/lib/auth";
 
 type UserRow = {
   id: string;
@@ -104,13 +102,12 @@ async function deactivateUserAction(formData: FormData) {
 }
 
 export default async function UsersPage() {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user?.role as UserRole | undefined) ?? "VIEWER";
+  const { role } = await requireAuthenticatedRoute("/users");
   const canManageUsers = role === "ADMIN";
   const users = await getUsers();
 
   return (
-    <DashboardLayout currentPath="/users" title="Users">
+    <DashboardLayout currentPath="/users" role={role} title="Users">
       <form action={createUserAction} className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Create User</h2>
         <div className="grid gap-3 md:grid-cols-3">

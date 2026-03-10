@@ -1,10 +1,8 @@
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
 import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
 import { SubmitButton } from "@/src/components/dashboard/SubmitButton";
-import { authOptions } from "@/src/lib/auth";
-import type { UserRole } from "@/src/types/user";
+import { requireAuthenticatedRoute } from "@/src/lib/auth";
 
 type FeedbackRow = {
   id: string;
@@ -96,13 +94,12 @@ async function updateFeedbackAction(formData: FormData) {
 }
 
 export default async function FeedbackPage() {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user?.role as UserRole | undefined) ?? "VIEWER";
+  const { role } = await requireAuthenticatedRoute("/feedback");
   const canCreateOrUpdate = role === "ADMIN" || role === "SUPERVISOR";
   const feedback = await getFeedbackRecords();
 
   return (
-    <DashboardLayout currentPath="/feedback" title="Feedback">
+    <DashboardLayout currentPath="/feedback" role={role} title="Feedback">
       {canCreateOrUpdate ? (
         <form
           action={createFeedbackAction}

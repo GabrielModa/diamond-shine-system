@@ -1,20 +1,20 @@
-import type { ModuleKey } from "../types/permissions";
+import type { AppRoute } from "../types/permissions";
 import type { UserRole } from "../types/user";
 
 export type SidebarLink = {
-  href: "/dashboard" | "/users" | "/supplies" | "/feedback";
+  href: AppRoute;
   label: "Dashboard" | "Users" | "Supplies" | "Feedback";
 };
 
-export const permissions: Record<UserRole, ModuleKey[]> = {
-  ADMIN: ["supplies", "feedback", "dashboard"],
-  SUPERVISOR: ["supplies", "feedback"],
-  EMPLOYEE: ["supplies"],
-  VIEWER: [],
+export const permissions: Record<UserRole, AppRoute[]> = {
+  ADMIN: ["/dashboard", "/users", "/supplies", "/feedback"],
+  SUPERVISOR: ["/dashboard", "/supplies", "/feedback"],
+  EMPLOYEE: ["/dashboard", "/supplies"],
+  VIEWER: ["/dashboard"],
 };
 
-export function canAccess(role: UserRole, page: ModuleKey) {
-  return permissions[role]?.includes(page) ?? false;
+export function canAccessRoute(role: UserRole, route: AppRoute) {
+  return permissions[role]?.includes(route) ?? false;
 }
 
 const SIDEBAR_LINKS_BY_ROLE: Record<UserRole, SidebarLink[]> = {

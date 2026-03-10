@@ -1,25 +1,17 @@
 "use client";
 
-import { getSession } from "next-auth/react";
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getSidebarLinks, type SidebarLink } from "@/src/lib/permissions";
 import type { UserRole } from "@/src/types/user";
 
-export function Sidebar() {
+type SidebarProps = {
+  role: UserRole;
+};
+
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
-  const [links, setLinks] = useState<SidebarLink[]>([{ href: "/dashboard", label: "Dashboard" }]);
-
-  useEffect(() => {
-    async function loadLinks() {
-      const session = await getSession();
-      const role = (session?.user?.role as UserRole | undefined) ?? "VIEWER";
-      setLinks(getSidebarLinks(role));
-    }
-
-    loadLinks();
-  }, []);
+  const links: SidebarLink[] = getSidebarLinks(role);
 
   return (
     <aside className="w-full max-w-xs border-r border-slate-200 bg-slate-900 p-4 text-white md:min-h-screen md:w-64 md:max-w-none">
