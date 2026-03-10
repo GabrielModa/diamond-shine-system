@@ -27,8 +27,11 @@ type CreateSupplyPayload = {
 
 function getService() {
   return createSuppliesServiceFromPrisma({
+    activity: prisma.activity,
     auditLog: prisma.auditLog,
+    notification: prisma.notification,
     supplyRequest: prisma.supplyRequest,
+    workflow: prisma.workflowInstance,
   });
 }
 
