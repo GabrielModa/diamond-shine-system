@@ -3,6 +3,7 @@ import type { UserRole } from "../../types/user";
 import { createAuditService } from "../audit/audit.service";
 import type {
   ApproveRequestInput,
+  CompleteRequestInput,
   CreateSupplyRequestInput,
   ListSupplyRequestsInput,
   RejectRequestInput,
@@ -60,7 +61,7 @@ type SupplyRequestDelegate = {
       id: string;
     };
     data: {
-      status: "APPROVED" | "REJECTED";
+      status: "APPROVED" | "REJECTED" | "COMPLETED";
     };
     select: {
       id: true;
@@ -82,7 +83,7 @@ type SuppliesServiceDeps = {
         action: string;
         entity: string;
         entityId: string;
-        metadata?: Record<string, unknown>;
+        metadata?: unknown;
       };
     }) => Promise<unknown>;
   };
@@ -238,6 +239,29 @@ export function createSuppliesService(
 
       await auditService.createAuditLog({
         action: "SUPPLY_REJECTED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: input.requestId,
+      });
+
+      return toSupply(updated);
+    },
+
+    async completeRequest(input: CompleteRequestInput): Promise<Supply> {
+      assertCanReview(input.actorRole);
+
+      const updated = await deps.supplyRequest.update({
+        data: {
+          status: "COMPLETED",
+        },
+        select: supplySelect,
+        where: {
+          id: input.requestId,
+        },
+      });
+
+      await auditService.createAuditLog({
+        action: "SUPPLY_COMPLETED",
         actorId: input.actorId,
         entity: "SupplyRequest",
         entityId: input.requestId,

@@ -103,6 +103,18 @@ async function rejectSupplyAction(formData: FormData) {
   revalidatePath("/supplies");
 }
 
+async function completeSupplyAction(formData: FormData) {
+  "use server";
+
+  const requestId = String(formData.get("requestId") ?? "");
+
+  await callSuppliesApi("/api/supplies", "PATCH", {
+    action: "complete",
+    requestId,
+  });
+  revalidatePath("/supplies");
+}
+
 export default async function SuppliesPage() {
   const { role } = await requireAuthenticatedRoute("/supplies");
   const canCreate = role === "ADMIN" || role === "EMPLOYEE";
@@ -184,6 +196,11 @@ export default async function SuppliesPage() {
                         />
                       </form>
                     </div>
+                  ) : canReview && supply.status === "APPROVED" ? (
+                    <form action={completeSupplyAction}>
+                      <input type="hidden" name="requestId" value={supply.id} />
+                      <SubmitButton idleLabel="Complete" pendingLabel="Completing..." />
+                    </form>
                   ) : (
                     <span className="text-xs text-slate-500">-</span>
                   )}

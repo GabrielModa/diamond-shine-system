@@ -26,3 +26,9 @@ export type RejectRequestInput = {
   actorRole: UserRole;
   requestId: string;
 };
+
+export type CompleteRequestInput = {
+  actorId: string;
+  actorRole: UserRole;
+  requestId: string;
+};

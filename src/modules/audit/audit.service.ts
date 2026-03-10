@@ -1,4 +1,4 @@
-import type { CreateAuditLogInput } from "./audit.types";
+import type { CreateAuditLogInput, ListAuditLogsInput } from "./audit.types";
 
 type AuditLogDelegate = {
   create: (args: {
@@ -7,9 +7,22 @@ type AuditLogDelegate = {
       action: string;
       entity: string;
       entityId: string;
-      metadata?: Record<string, unknown>;
+      metadata?: unknown;
     };
   }) => Promise<unknown>;
+  findMany?: (args: {
+    orderBy: {
+      createdAt: "desc";
+    };
+  }) => Promise<Array<{
+    action: string;
+    actorId: string;
+    createdAt: Date;
+    entity: string;
+    entityId: string;
+    id: string;
+    metadata: unknown;
+  }>>;
 };
 
 type AuditServiceDeps = {
@@ -26,6 +39,22 @@ export function createAuditService(deps: AuditServiceDeps) {
           entity: input.entity,
           entityId: input.entityId,
           metadata: input.metadata,
+        },
+      });
+    },
+
+    async listAuditLogs(input: ListAuditLogsInput) {
+      if (input.actorRole !== "ADMIN") {
+        throw new Error("Only admins can view audit logs.");
+      }
+
+      if (!deps.auditLog.findMany) {
+        throw new Error("Audit log listing is not configured.");
+      }
+
+      return deps.auditLog.findMany({
+        orderBy: {
+          createdAt: "desc",
         },
       });
     },

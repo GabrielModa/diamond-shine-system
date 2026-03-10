@@ -19,3 +19,9 @@ export type DeactivateUserInput = {
   actorRole: UserRole;
   userId: string;
 };
+
+export type ActivateUserInput = {
+  actorId: string;
+  actorRole: UserRole;
+  userId: string;
+};

@@ -77,7 +77,7 @@ type FeedbackServiceDeps = {
         action: string;
         entity: string;
         entityId: string;
-        metadata?: Record<string, unknown>;
+        metadata?: unknown;
       };
     }) => Promise<unknown>;
   };

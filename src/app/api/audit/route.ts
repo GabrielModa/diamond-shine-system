@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
+import { createAuditServiceFromPrisma } from "../../../modules/audit/audit.service";
 import type { UserRole } from "../../../types/user";
 
 function toErrorResponse(error: unknown): NextResponse {
@@ -29,18 +30,18 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (sessionUser.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const logs = await prisma.auditLog.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
+    const logs = await createAuditServiceFromPrisma({
+      auditLog: prisma.auditLog,
+    }).listAuditLogs({
+      actorRole: sessionUser.role,
     });
 
     return NextResponse.json(logs);
   } catch (error) {
+    if (error instanceof Error && error.message === "Only admins can view audit logs.") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     return toErrorResponse(error);
   }
 }

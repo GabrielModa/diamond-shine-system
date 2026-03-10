@@ -8,6 +8,7 @@ const {
 } = vi.hoisted(() => {
   const suppliesService = {
     approveRequest: vi.fn(),
+    completeRequest: vi.fn(),
     createSupplyRequest: vi.fn(),
     listSupplyRequests: vi.fn(),
     rejectRequest: vi.fn(),
@@ -149,6 +150,48 @@ describe("Supplies API", () => {
     expect(suppliesServiceMock.rejectRequest).toHaveBeenCalledWith({
       actorId: "u-supervisor",
       actorRole: "SUPERVISOR",
+      requestId: "r1",
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("PATCH /api/supplies completes a request", async () => {
+    const payload = {
+      action: "complete",
+      requestId: "r1",
+    } as const;
+
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        email: "admin@example.com",
+        id: "u-admin",
+        role: "ADMIN",
+      },
+    });
+
+    suppliesServiceMock.completeRequest.mockResolvedValue({
+      department: "Operations",
+      id: "r1",
+      item: "Gloves",
+      quantity: 10,
+      requestDate: new Date("2026-03-08T00:00:00.000Z"),
+      requesterId: "u1",
+      status: "COMPLETED",
+    });
+
+    const request = new NextRequest("http://localhost/api/supplies", {
+      body: JSON.stringify(payload),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "PATCH",
+    });
+
+    const response = await PATCH(request);
+
+    expect(suppliesServiceMock.completeRequest).toHaveBeenCalledWith({
+      actorId: "u-admin",
+      actorRole: "ADMIN",
       requestId: "r1",
     });
     expect(response.status).toBe(200);

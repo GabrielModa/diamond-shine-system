@@ -60,6 +60,7 @@ describe("Authentication options", () => {
       id: "u1",
       password: "stored-hash",
       role: "EMPLOYEE",
+      status: "ACTIVE",
     });
     bcryptCompareMock.mockResolvedValue(false);
 
@@ -87,8 +88,10 @@ describe("Authentication options", () => {
       session: {
         expires: "2099-01-01T00:00:00.000Z",
         user: {
+          id: "",
           email: "",
           name: null,
+          role: "EMPLOYEE",
         },
       },
       token: {
@@ -98,6 +101,7 @@ describe("Authentication options", () => {
       },
       user: {
         email: "member@example.com",
+        emailVerified: null,
         id: "u1",
         role: "SUPERVISOR",
       },
@@ -114,6 +118,7 @@ describe("Authentication options", () => {
     const signInResult = await authOptions.callbacks?.signIn?.({
       account: {
         provider: "google",
+        providerAccountId: "google-user",
         type: "oauth",
       },
       credentials: undefined,
@@ -121,6 +126,7 @@ describe("Authentication options", () => {
       profile: undefined,
       user: {
         email: "google.user@example.com",
+        emailVerified: null,
         id: "u2",
         role: "EMPLOYEE",
       },

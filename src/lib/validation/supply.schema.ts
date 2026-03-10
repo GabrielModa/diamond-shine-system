@@ -7,6 +7,6 @@ export const createSupplySchema = z.object({
 });
 
 export const reviewSupplySchema = z.object({
-  action: z.enum(["approve", "reject"]),
+  action: z.enum(["approve", "reject", "complete"]),
   requestId: z.string().min(1),
 });

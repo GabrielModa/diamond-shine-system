@@ -88,6 +88,7 @@ describe("Authentication service", () => {
         password: "hashed-password",
         provider: "LOCAL",
         role: "EMPLOYEE",
+        status: "ACTIVE",
       },
       select: {
         email: true,
