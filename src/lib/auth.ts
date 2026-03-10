@@ -6,6 +6,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { redirect } from "next/navigation";
 import { canAccessRoute } from "./permissions";
+import { checkRateLimit, getRequestIp } from "./security/rateLimit";
 import type { AppRoute } from "../types/permissions";
 import type { UserRole } from "../types/user";
 import { prisma } from "./prisma";
@@ -15,7 +16,19 @@ const DEFAULT_ROLE: UserRole = "EMPLOYEE";
 export async function authorizeWithCredentials(credentials?: {
   email?: string;
   password?: string;
-}) {
+}, request?: { headers?: Headers | Record<string, string | string[] | undefined> }) {
+  if (request?.headers) {
+    const ip = getRequestIp(request.headers);
+    const rateLimit = await checkRateLimit({
+      key: `login:${ip}`,
+      limit: 10,
+    });
+
+    if (!rateLimit.allowed) {
+      return null;
+    }
+  }
+
   const email = credentials?.email?.trim().toLowerCase();
   const password = credentials?.password;
 
@@ -85,7 +98,7 @@ export const authOptions: NextAuthOptions = {
 
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token, user }) {
       if (!session.user) {
         session.user = {
           email: "",
@@ -94,15 +107,34 @@ export const authOptions: NextAuthOptions = {
         };
       }
 
-      session.user.id = (token.id as string | undefined) ?? "";
-      session.user.email = (token.email as string | undefined) ?? "";
-      session.user.role = (token.role as UserRole | undefined) ?? DEFAULT_ROLE;
+      if (user) {
+        session.user.id = user.id;
+        session.user.email = user.email ?? "";
+        session.user.role = (user.role as UserRole | undefined) ?? DEFAULT_ROLE;
+      } else {
+        session.user.id = (token.id as string | undefined) ?? "";
+        session.user.email = (token.email as string | undefined) ?? "";
+        session.user.role = (token.role as UserRole | undefined) ?? DEFAULT_ROLE;
+      }
 
       return session;
     },
     async signIn({ account, user }) {
       if (!user.id || !account?.provider) {
         return true;
+      }
+
+      const status = await prisma.user.findUnique({
+        select: {
+          status: true,
+        },
+        where: {
+          id: user.id,
+        },
+      });
+
+      if (status?.status === "INACTIVE") {
+        return false;
       }
 
       if (account.provider === "google") {
@@ -146,8 +178,8 @@ export const authOptions: NextAuthOptions = {
         },
       },
       name: "Email Login",
-      async authorize(credentials) {
-        return authorizeWithCredentials(credentials);
+      async authorize(credentials, req) {
+        return authorizeWithCredentials(credentials, req);
       },
     }),
     GoogleProvider({
@@ -157,19 +189,53 @@ export const authOptions: NextAuthOptions = {
   ],
   secret: process.env.NEXTAUTH_SECRET,
   session: {
-    strategy: "jwt",
+    strategy: "database",
   },
 };
 
-export async function requireAuthenticatedRoute(route: AppRoute) {
+export async function getActiveSessionUser(): Promise<{ id: string; role: UserRole } | null> {
   const { getServerSession } = await import("next-auth");
   const session = await getServerSession(authOptions);
+  const user = session?.user as { id?: string; role?: UserRole } | undefined;
 
-  if (!session?.user) {
+  if (!user?.id) {
+    return null;
+  }
+
+  const persisted = await prisma.user.findUnique({
+    select: {
+      role: true,
+      status: true,
+    },
+    where: {
+      id: user.id,
+    },
+  });
+
+  if (!persisted || persisted.status !== "ACTIVE") {
+    if (user.id) {
+      await prisma.session.deleteMany({
+        where: {
+          userId: user.id,
+        },
+      });
+    }
+    return null;
+  }
+
+  return {
+    id: user.id,
+    role: (persisted.role as UserRole | undefined) ?? DEFAULT_ROLE,
+  };
+}
+
+export async function requireAuthenticatedRoute(route: AppRoute) {
+  const sessionUser = await getActiveSessionUser();
+  if (!sessionUser) {
     redirect("/login");
   }
 
-  const role = (session.user.role as UserRole | undefined) ?? DEFAULT_ROLE;
+  const role = sessionUser.role;
 
   if (!canAccessRoute(role, route)) {
     redirect("/dashboard");
@@ -177,6 +243,8 @@ export async function requireAuthenticatedRoute(route: AppRoute) {
 
   return {
     role,
-    session,
+    session: {
+      user: sessionUser,
+    },
   };
 }

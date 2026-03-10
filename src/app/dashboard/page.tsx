@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
 import { requireAuthenticatedRoute } from "@/src/lib/auth";
 import { canAccessRoute } from "@/src/lib/permissions";
 import { FeedbackChart } from "@/src/components/metrics/FeedbackChart";
 import { MetricsCards } from "@/src/components/metrics/MetricsCards";
 import { SuppliesChart } from "@/src/components/metrics/SuppliesChart";
+import { getDashboardMetrics } from "@/src/modules/dashboard/dashboard.metrics";
 import type { AppRoute } from "@/src/types/permissions";
 
 const CARDS: Array<{
@@ -30,45 +30,14 @@ const CARDS: Array<{
   },
 ];
 
-type DashboardMetrics = {
-  totalUsers: number;
-  activeUsers: number;
-  pendingSupplies: number;
-  approvedSupplies: number;
-  rejectedSupplies: number;
-  totalFeedback: number;
-  averageFeedbackScore: number;
-  suppliesByDepartment: Array<{ department: string; count: number }>;
-  feedbackScoreTrend: Array<{ date: string; averageScore: number }>;
-};
-
-async function getDashboardMetrics(): Promise<DashboardMetrics> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
-
-  if (!host) {
-    throw new Error("Unable to resolve request host.");
-  }
-
-  const response = await fetch(`${protocol}://${host}/api/metrics`, {
-    cache: "no-store",
-    headers: {
-      cookie: requestHeaders.get("cookie") ?? "",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to load metrics.");
-  }
-
-  return (await response.json()) as DashboardMetrics;
+async function loadDashboardMetrics(role: "ADMIN" | "SUPERVISOR") {
+  return getDashboardMetrics(role);
 }
 
 export default async function DashboardPage() {
   const { role } = await requireAuthenticatedRoute("/dashboard");
   const canAccessMetrics = role === "ADMIN" || role === "SUPERVISOR";
-  const metrics = canAccessMetrics ? await getDashboardMetrics() : null;
+  const metrics = canAccessMetrics ? await loadDashboardMetrics(role) : null;
   const visibleCards = CARDS.filter((card) => canAccessRoute(role, card.href));
 
   return (

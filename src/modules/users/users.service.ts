@@ -77,6 +77,13 @@ type UsersServiceDeps = {
       };
     }) => Promise<unknown>;
   };
+  session: {
+    deleteMany: (args: {
+      where: {
+        userId: string;
+      };
+    }) => Promise<unknown>;
+  };
   user: UserDelegate;
 };
 
@@ -185,6 +192,12 @@ export function createUsersService(
         select: userSelect,
         where: {
           id: input.userId,
+        },
+      });
+
+      await deps.session.deleteMany({
+        where: {
+          userId: input.userId,
         },
       });
 

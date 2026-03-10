@@ -1,6 +1,6 @@
 import type { UserRole } from "../../types/user";
 
-type DashboardMetrics = {
+export type DashboardMetrics = {
   activeUsers: number;
   approvedSupplies: number;
   averageFeedbackScore: number;

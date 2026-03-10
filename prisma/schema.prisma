@@ -114,3 +114,11 @@ model AuditLog {
   metadata  Json?
   createdAt DateTime @default(now())
 }
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

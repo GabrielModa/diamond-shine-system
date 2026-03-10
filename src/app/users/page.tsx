@@ -1,8 +1,9 @@
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
 import { SubmitButton } from "@/src/components/dashboard/SubmitButton";
-import { requireAuthenticatedRoute } from "@/src/lib/auth";
+import { getActiveSessionUser, requireAuthenticatedRoute } from "@/src/lib/auth";
+import { prisma } from "@/src/lib/prisma";
+import { createUsersServiceFromPrisma } from "@/src/modules/users/users.service";
 
 type UserRow = {
   id: string;
@@ -12,54 +13,28 @@ type UserRow = {
   createdAt: string;
 };
 
-async function getUsers(): Promise<UserRow[]> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
-
-  if (!host) {
-    throw new Error("Unable to resolve request host.");
-  }
-
-  const response = await fetch(`${protocol}://${host}/api/users`, {
-    cache: "no-store",
-    headers: {
-      cookie: requestHeaders.get("cookie") ?? "",
-    },
+function getUsersService() {
+  return createUsersServiceFromPrisma({
+    auditLog: prisma.auditLog,
+    session: prisma.session,
+    user: prisma.user,
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to load users.");
-  }
-
-  return (await response.json()) as UserRow[];
 }
 
-async function callUsersApi(path: string, method: "POST" | "PATCH", body: Record<string, unknown>) {
-  "use server";
+async function getUsers(): Promise<UserRow[]> {
+  const users = await getUsersService().listUsers();
+  return users.map((user) => ({
+    ...user,
+    createdAt: user.createdAt.toISOString(),
+  }));
+}
 
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
-
-  if (!host) {
-    throw new Error("Unable to resolve request host.");
+async function requireActionUser() {
+  const sessionUser = await getActiveSessionUser();
+  if (!sessionUser) {
+    throw new Error("Unauthorized");
   }
-
-  const response = await fetch(`${protocol}://${host}${path}`, {
-    body: JSON.stringify(body),
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      cookie: requestHeaders.get("cookie") ?? "",
-    },
-    method,
-  });
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(payload?.error ?? "Failed to process users action.");
-  }
+  return sessionUser;
 }
 
 async function createUserAction(formData: FormData) {
@@ -67,10 +42,12 @@ async function createUserAction(formData: FormData) {
 
   const email = String(formData.get("email") ?? "");
   const role = String(formData.get("role") ?? "EMPLOYEE");
+  const sessionUser = await requireActionUser();
 
-  await callUsersApi("/api/users", "POST", {
+  await getUsersService().createUser({
+    actorId: sessionUser.id,
     email,
-    role,
+    role: role as "ADMIN" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER",
   });
   revalidatePath("/users");
 }
@@ -80,10 +57,12 @@ async function updateRoleAction(formData: FormData) {
 
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "");
+  const sessionUser = await requireActionUser();
 
-  await callUsersApi("/api/users", "PATCH", {
-    action: "updateRole",
-    role,
+  await getUsersService().updateUserRole({
+    actorId: sessionUser.id,
+    actorRole: sessionUser.role,
+    role: role as "ADMIN" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER",
     userId,
   });
   revalidatePath("/users");
@@ -93,9 +72,11 @@ async function deactivateUserAction(formData: FormData) {
   "use server";
 
   const userId = String(formData.get("userId") ?? "");
+  const sessionUser = await requireActionUser();
 
-  await callUsersApi("/api/users", "PATCH", {
-    action: "deactivate",
+  await getUsersService().deactivateUser({
+    actorId: sessionUser.id,
+    actorRole: sessionUser.role,
     userId,
   });
   revalidatePath("/users");
@@ -105,9 +86,11 @@ async function activateUserAction(formData: FormData) {
   "use server";
 
   const userId = String(formData.get("userId") ?? "");
+  const sessionUser = await requireActionUser();
 
-  await callUsersApi("/api/users", "PATCH", {
-    action: "activate",
+  await getUsersService().activateUser({
+    actorId: sessionUser.id,
+    actorRole: sessionUser.role,
     userId,
   });
   revalidatePath("/users");

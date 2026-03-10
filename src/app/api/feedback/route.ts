@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../../lib/auth";
+import { getActiveSessionUser } from "../../../lib/auth";
+import { withTraceId } from "../../../lib/observability/http";
+import { logError, logWarn } from "../../../lib/observability/logger";
+import { getTraceId } from "../../../lib/observability/trace";
 import { prisma } from "../../../lib/prisma";
-import { checkRateLimit } from "../../../lib/security/rateLimit";
+import { checkRateLimit, getRequestIp } from "../../../lib/security/rateLimit";
 import { SchemaValidationError, validateSchema } from "../../../lib/security/validate";
 import {
   createFeedbackSchema,
@@ -33,18 +35,24 @@ function getService() {
   });
 }
 
-function toErrorResponse(error: unknown): NextResponse {
+function toErrorResponse(error: unknown, traceId: string): NextResponse {
   if (error instanceof SchemaValidationError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
+    return withTraceId(
+      NextResponse.json({ error: error.message }, { status: error.status }),
+      traceId,
+    );
   }
 
   const message = error instanceof Error ? error.message : "Unexpected error.";
-  return NextResponse.json({ error: message }, { status: 400 });
+  return withTraceId(NextResponse.json({ error: message }, { status: 400 }), traceId);
 }
 
-function getRateLimitResponse(request: NextRequest): NextResponse | null {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const result = checkRateLimit({
+async function getRateLimitResponse(
+  request: NextRequest,
+  traceId: string,
+): Promise<NextResponse | null> {
+  const ip = getRequestIp(request.headers);
+  const result = await checkRateLimit({
     key: `feedback:${ip}`,
   });
 
@@ -52,41 +60,45 @@ function getRateLimitResponse(request: NextRequest): NextResponse | null {
     return null;
   }
 
-  return NextResponse.json(
-    { error: "Too many requests. Please try again later." },
-    {
-      headers: {
-        "Retry-After": String(result.retryAfterSeconds),
+  logWarn("Rate limit exceeded", {
+    ip,
+    key: "feedback",
+    route: "API /api/feedback",
+    traceId,
+  });
+
+  return withTraceId(
+    NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        headers: {
+          "Retry-After": String(result.retryAfterSeconds),
+        },
+        status: 429,
       },
-      status: 429,
-    },
+    ),
+    traceId,
   );
 }
 
 async function getSessionUser(): Promise<{ id: string; role: UserRole } | null> {
-  const session = await getServerSession(authOptions);
-  const user = session?.user as { id?: string; role?: UserRole } | undefined;
-
-  if (!user?.id || !user.role) {
-    return null;
-  }
-
-  return {
-    id: user.id,
-    role: user.role,
-  };
+  return getActiveSessionUser();
 }
 
 export async function GET(request: NextRequest) {
+  const traceId = getTraceId(request.headers);
   try {
-    const rateLimitResponse = getRateLimitResponse(request);
+    const rateLimitResponse = await getRateLimitResponse(request, traceId);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withTraceId(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        traceId,
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -102,22 +114,27 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await getService().listFeedback(input);
-    return NextResponse.json(result);
+    return withTraceId(NextResponse.json(result), traceId);
   } catch (error) {
-    return toErrorResponse(error);
+    logError("Feedback API error", error, { route: "GET /api/feedback", traceId });
+    return toErrorResponse(error, traceId);
   }
 }
 
 export async function POST(request: NextRequest) {
+  const traceId = getTraceId(request.headers);
   try {
-    const rateLimitResponse = getRateLimitResponse(request);
+    const rateLimitResponse = await getRateLimitResponse(request, traceId);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withTraceId(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        traceId,
+      );
     }
 
     const payload = validateSchema<CreateFeedbackPayload>(createFeedbackSchema, await request.json());
@@ -129,22 +146,27 @@ export async function POST(request: NextRequest) {
       reviewerId: sessionUser.id,
       score: payload.score,
     });
-    return NextResponse.json(result, { status: 201 });
+    return withTraceId(NextResponse.json(result, { status: 201 }), traceId);
   } catch (error) {
-    return toErrorResponse(error);
+    logError("Feedback API error", error, { route: "POST /api/feedback", traceId });
+    return toErrorResponse(error, traceId);
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const traceId = getTraceId(request.headers);
   try {
-    const rateLimitResponse = getRateLimitResponse(request);
+    const rateLimitResponse = await getRateLimitResponse(request, traceId);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withTraceId(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        traceId,
+      );
     }
 
     const payload = validateSchema<UpdateFeedbackPayload>(updateFeedbackSchema, await request.json());
@@ -155,8 +177,9 @@ export async function PATCH(request: NextRequest) {
       feedbackId: payload.feedbackId,
       score: payload.score,
     });
-    return NextResponse.json(result);
+    return withTraceId(NextResponse.json(result), traceId);
   } catch (error) {
-    return toErrorResponse(error);
+    logError("Feedback API error", error, { route: "PATCH /api/feedback", traceId });
+    return toErrorResponse(error, traceId);
   }
 }

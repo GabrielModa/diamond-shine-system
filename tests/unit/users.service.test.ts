@@ -11,6 +11,9 @@ function createPrismaMock() {
     auditLog: {
       create: vi.fn(),
     },
+    session: {
+      deleteMany: vi.fn(),
+    },
     user: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -139,7 +142,7 @@ describe("Users service", () => {
     });
   });
 
-  it("deactivates a user as viewer", async () => {
+  it("deactivates a user and revokes sessions", async () => {
     const prisma = createPrismaMock();
     const service = createUsersService(prisma as never);
 
@@ -177,6 +180,11 @@ describe("Users service", () => {
       },
     });
     expect(result.status).toBe("INACTIVE");
+    expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+      where: {
+        userId: input.userId,
+      },
+    });
     expect(prisma.auditLog.create).toHaveBeenCalledWith({
       data: {
         action: "USER_DEACTIVATED",
