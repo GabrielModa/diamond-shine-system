@@ -1,5 +1,6 @@
 import { createUsersService } from "../../src/modules/users/users.service";
 import type {
+  ActivateUserInput,
   CreateUserInput,
   DeactivateUserInput,
   UpdateUserRoleInput,
@@ -31,7 +32,9 @@ describe("Users service", () => {
     prisma.user.create.mockResolvedValue({
       id: "u1",
       email: input.email,
+      name: null,
       role: "EMPLOYEE",
+      status: "ACTIVE",
       createdAt: new Date("2026-03-07T00:00:00.000Z"),
     });
 
@@ -42,12 +45,15 @@ describe("Users service", () => {
         email: input.email,
         provider: "LOCAL",
         role: "EMPLOYEE",
+        status: "ACTIVE",
       },
       select: {
         createdAt: true,
         email: true,
         id: true,
+        name: true,
         role: true,
+        status: true,
       },
     });
     expect(result.status).toBe("ACTIVE");
@@ -95,7 +101,9 @@ describe("Users service", () => {
     prisma.user.update.mockResolvedValue({
       id: input.userId,
       email: "test@example.com",
+      name: null,
       role: input.role,
+      status: "ACTIVE",
       createdAt: new Date("2026-03-07T00:00:00.000Z"),
     });
 
@@ -109,7 +117,9 @@ describe("Users service", () => {
         createdAt: true,
         email: true,
         id: true,
+        name: true,
         role: true,
+        status: true,
       },
       where: {
         id: input.userId,
@@ -142,7 +152,9 @@ describe("Users service", () => {
     prisma.user.update.mockResolvedValue({
       id: input.userId,
       email: "test@example.com",
-      role: "VIEWER",
+      name: null,
+      role: "EMPLOYEE",
+      status: "INACTIVE",
       createdAt: new Date("2026-03-07T00:00:00.000Z"),
     });
 
@@ -150,13 +162,15 @@ describe("Users service", () => {
 
     expect(prisma.user.update).toHaveBeenCalledWith({
       data: {
-        role: "VIEWER",
+        status: "INACTIVE",
       },
       select: {
         createdAt: true,
         email: true,
         id: true,
+        name: true,
         role: true,
+        status: true,
       },
       where: {
         id: input.userId,
@@ -181,13 +195,17 @@ describe("Users service", () => {
       {
         id: "u1",
         email: "admin@example.com",
+        name: null,
         role: "ADMIN",
+        status: "ACTIVE",
         createdAt: new Date("2026-03-07T00:00:00.000Z"),
       },
       {
         id: "u2",
         email: "viewer@example.com",
+        name: null,
         role: "VIEWER",
+        status: "INACTIVE",
         createdAt: new Date("2026-03-06T00:00:00.000Z"),
       },
     ]);
@@ -202,10 +220,60 @@ describe("Users service", () => {
         createdAt: true,
         email: true,
         id: true,
+        name: true,
         role: true,
+        status: true,
       },
     });
     expect(result[0].status).toBe("ACTIVE");
     expect(result[1].status).toBe("INACTIVE");
+  });
+
+  it("activates a user as admin", async () => {
+    const prisma = createPrismaMock();
+    const service = createUsersService(prisma as never);
+
+    const input: ActivateUserInput = {
+      actorId: "u-admin",
+      actorRole: "ADMIN",
+      userId: "u1",
+    };
+
+    prisma.user.update.mockResolvedValue({
+      id: input.userId,
+      email: "test@example.com",
+      name: null,
+      role: "EMPLOYEE",
+      status: "ACTIVE",
+      createdAt: new Date("2026-03-07T00:00:00.000Z"),
+    });
+
+    const result = await service.activateUser(input);
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      data: {
+        status: "ACTIVE",
+      },
+      select: {
+        createdAt: true,
+        email: true,
+        id: true,
+        name: true,
+        role: true,
+        status: true,
+      },
+      where: {
+        id: input.userId,
+      },
+    });
+    expect(result.status).toBe("ACTIVE");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "USER_ACTIVATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: input.userId,
+      },
+    });
   });
 });

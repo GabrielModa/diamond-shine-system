@@ -18,6 +18,7 @@ type UserDelegate = {
       password: string;
       provider: AuthProvider;
       role: UserRole;
+      status: "ACTIVE";
     };
     select: {
       email: true;
@@ -124,6 +125,7 @@ export function createAuthenticationService(deps: AuthenticationServiceDeps) {
           password: hashedPassword,
           provider: AuthProvider.LOCAL,
           role: "EMPLOYEE",
+          status: "ACTIVE",
         },
         select: REGISTER_SELECT,
       });

@@ -3,5 +3,9 @@ export type CreateAuditLogInput = {
   action: string;
   entity: string;
   entityId: string;
-  metadata?: Record<string, unknown>;
+  metadata?: unknown;
+};
+
+export type ListAuditLogsInput = {
+  actorRole: "ADMIN" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER";
 };

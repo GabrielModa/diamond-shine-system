@@ -17,6 +17,11 @@ type DeactivateUserPayload = {
   userId: string;
 };
 
+type ActivateUserPayload = {
+  action: "activate";
+  userId: string;
+};
+
 type UpdateRolePayload = {
   action: "updateRole";
   role: UserRole;
@@ -134,13 +139,22 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const payload = validateSchema<UpdateRolePayload | DeactivateUserPayload>(
+    const payload = validateSchema<UpdateRolePayload | DeactivateUserPayload | ActivateUserPayload>(
       patchUserSchema,
       await request.json(),
     );
 
     if (payload.action === "deactivate") {
       const result = await getService().deactivateUser({
+        actorId: sessionUser.id,
+        actorRole: sessionUser.role,
+        userId: payload.userId,
+      });
+      return NextResponse.json(result);
+    }
+
+    if (payload.action === "activate") {
+      const result = await getService().activateUser({
         actorId: sessionUser.id,
         actorRole: sessionUser.role,
         userId: payload.userId,

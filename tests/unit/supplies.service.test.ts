@@ -1,6 +1,7 @@
 import { createSuppliesService } from "../../src/modules/supplies/supplies.service";
 import type {
   ApproveRequestInput,
+  CompleteRequestInput,
   CreateSupplyRequestInput,
   ListSupplyRequestsInput,
   RejectRequestInput,
@@ -299,6 +300,56 @@ describe("Supplies service", () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith({
       data: {
         action: "SUPPLY_REJECTED",
+        actorId: input.actorId,
+        entity: "SupplyRequest",
+        entityId: input.requestId,
+      },
+    });
+  });
+
+  it("completes an approved request as admin", async () => {
+    const prisma = createPrismaMock();
+    const service = createSuppliesService(prisma as never);
+
+    const input: CompleteRequestInput = {
+      actorId: "u-admin",
+      actorRole: "ADMIN",
+      requestId: "r1",
+    };
+
+    prisma.supplyRequest.update.mockResolvedValue({
+      department: "Operations",
+      id: "r1",
+      item: "Gloves",
+      quantity: 10,
+      requestDate: new Date("2026-03-07T00:00:00.000Z"),
+      requesterId: "u1",
+      status: "COMPLETED",
+    });
+
+    const result = await service.completeRequest(input);
+
+    expect(prisma.supplyRequest.update).toHaveBeenCalledWith({
+      data: {
+        status: "COMPLETED",
+      },
+      select: {
+        department: true,
+        id: true,
+        item: true,
+        quantity: true,
+        requestDate: true,
+        requesterId: true,
+        status: true,
+      },
+      where: {
+        id: input.requestId,
+      },
+    });
+    expect(result.status).toBe("COMPLETED");
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "SUPPLY_COMPLETED",
         actorId: input.actorId,
         entity: "SupplyRequest",
         entityId: input.requestId,

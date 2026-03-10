@@ -101,6 +101,18 @@ async function deactivateUserAction(formData: FormData) {
   revalidatePath("/users");
 }
 
+async function activateUserAction(formData: FormData) {
+  "use server";
+
+  const userId = String(formData.get("userId") ?? "");
+
+  await callUsersApi("/api/users", "PATCH", {
+    action: "activate",
+    userId,
+  });
+  revalidatePath("/users");
+}
+
 export default async function UsersPage() {
   const { role } = await requireAuthenticatedRoute("/users");
   const canManageUsers = role === "ADMIN";
@@ -173,7 +185,16 @@ export default async function UsersPage() {
                             className="rounded bg-red-700 px-4 py-2 text-sm text-white disabled:opacity-60"
                           />
                         </form>
-                      ) : null}
+                      ) : (
+                        <form action={activateUserAction}>
+                          <input type="hidden" name="userId" value={user.id} />
+                          <SubmitButton
+                            idleLabel="Activate"
+                            pendingLabel="Activating..."
+                            className="rounded bg-emerald-700 px-4 py-2 text-sm text-white disabled:opacity-60"
+                          />
+                        </form>
+                      )}
                     </div>
                   ) : (
                     <span className="text-xs text-slate-500">No actions available</span>

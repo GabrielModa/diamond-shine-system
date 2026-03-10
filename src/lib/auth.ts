@@ -29,6 +29,7 @@ export async function authorizeWithCredentials(credentials?: {
       id: true,
       password: true,
       role: true,
+      status: true,
     },
     where: {
       email,
@@ -36,6 +37,10 @@ export async function authorizeWithCredentials(credentials?: {
   });
 
   if (!existingUser) {
+    return null;
+  }
+
+  if (existingUser.status !== "ACTIVE") {
     return null;
   }
 

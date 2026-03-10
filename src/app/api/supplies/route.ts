@@ -13,7 +13,7 @@ import type { ListSupplyRequestsInput } from "../../../modules/supplies/supplies
 import type { UserRole } from "../../../types/user";
 
 type ReviewSupplyPayload = {
-  action: "approve" | "reject";
+  action: "approve" | "reject" | "complete";
   requestId: string;
 };
 
@@ -157,6 +157,15 @@ export async function PATCH(request: NextRequest) {
 
     if (payload.action === "reject") {
       const result = await getService().rejectRequest({
+        actorId: sessionUser.id,
+        actorRole: sessionUser.role,
+        requestId: payload.requestId,
+      });
+      return NextResponse.json(result);
+    }
+
+    if (payload.action === "complete") {
+      const result = await getService().completeRequest({
         actorId: sessionUser.id,
         actorRole: sessionUser.role,
         requestId: payload.requestId,

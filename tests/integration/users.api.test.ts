@@ -7,6 +7,7 @@ const {
   usersServiceMock,
 } = vi.hoisted(() => {
   const usersService = {
+    activateUser: vi.fn(),
     createUser: vi.fn(),
     deactivateUser: vi.fn(),
     listUsers: vi.fn(),
@@ -95,6 +96,7 @@ describe("Users API", () => {
         createdAt: new Date("2026-03-08T00:00:00.000Z"),
         email: "admin@example.com",
         id: "u1",
+        name: null,
         role: "ADMIN",
         status: "ACTIVE",
       },
@@ -136,6 +138,39 @@ describe("Users API", () => {
       actorId: "u-admin",
       actorRole: "ADMIN",
       role: "SUPERVISOR",
+      userId: "u1",
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("PATCH /api/users activates a user", async () => {
+    const payload = {
+      action: "activate",
+      userId: "u1",
+    } as const;
+
+    usersServiceMock.activateUser.mockResolvedValue({
+      createdAt: new Date("2026-03-08T00:00:00.000Z"),
+      email: "employee@example.com",
+      id: "u1",
+      name: null,
+      role: "EMPLOYEE",
+      status: "ACTIVE",
+    });
+
+    const request = new NextRequest("http://localhost/api/users", {
+      body: JSON.stringify(payload),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "PATCH",
+    });
+
+    const response = await PATCH(request);
+
+    expect(usersServiceMock.activateUser).toHaveBeenCalledWith({
+      actorId: "u-admin",
+      actorRole: "ADMIN",
       userId: "u1",
     });
     expect(response.status).toBe(200);

@@ -1,4 +1,4 @@
-export type SupplyStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type SupplyStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
 
 export type Supply = {
   id: string;

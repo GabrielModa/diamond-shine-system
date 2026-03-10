@@ -8,17 +8,21 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
+  id            String         @id @default(uuid())
   name          String?
-  email         String    @unique
+  email         String         @unique
   emailVerified DateTime?
   image         String?
   password      String?
-  role          Role      @default(EMPLOYEE)
-  provider      AuthProvider @default(LOCAL)
-  createdAt     DateTime  @default(now())
+  role          Role           @default(EMPLOYEE)
+  status        UserStatus     @default(ACTIVE)
+  provider      AuthProvider   @default(LOCAL)
+  createdAt     DateTime       @default(now())
   accounts      Account[]
   sessions      Session[]
+  supplyRequests SupplyRequest[] @relation("SupplyRequester")
+  feedbackAuthored Feedback[]    @relation("FeedbackReviewer")
+  feedbackReceived Feedback[]    @relation("FeedbackEmployee")
 }
 
 model Account {
@@ -62,9 +66,43 @@ enum Role {
   VIEWER
 }
 
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum AuthProvider {
   LOCAL
   GOOGLE
+}
+
+enum SupplyStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model SupplyRequest {
+  id          String       @id @default(uuid())
+  item        String
+  quantity    Int
+  department  String
+  status      SupplyStatus @default(PENDING)
+  requestDate DateTime     @default(now())
+  requesterId String
+  requester   User         @relation("SupplyRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+}
+
+model Feedback {
+  id         String   @id @default(uuid())
+  employeeId String
+  reviewerId String
+  score      Int
+  comments   String
+  date       DateTime @default(now())
+  employee   User     @relation("FeedbackEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewer   User     @relation("FeedbackReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {

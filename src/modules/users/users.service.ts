@@ -1,6 +1,7 @@
 import type { User, UserRole } from "../../types/user";
 import { createAuditService } from "../audit/audit.service";
 import type {
+  ActivateUserInput,
   CreateUserInput,
   DeactivateUserInput,
   UpdateUserRoleInput,
@@ -8,8 +9,10 @@ import type {
 
 type UserRecord = {
   id: string;
+  name?: string | null;
   email: string;
   role: UserRole;
+  status: "ACTIVE" | "INACTIVE";
   createdAt: Date;
 };
 
@@ -19,19 +22,24 @@ type UserDelegate = {
       email: string;
       provider: "LOCAL" | "GOOGLE";
       role: UserRole;
+      status: "ACTIVE";
     };
     select: {
       id: true;
+      name: true;
       email: true;
       role: true;
+      status: true;
       createdAt: true;
     };
   }) => Promise<UserRecord>;
   findMany: (args: {
     select: {
       id: true;
+      name: true;
       email: true;
       role: true;
+      status: true;
       createdAt: true;
     };
     orderBy: {
@@ -43,12 +51,15 @@ type UserDelegate = {
       id: string;
     };
     data: {
-      role: UserRole;
+      role?: UserRole;
+      status?: "ACTIVE" | "INACTIVE";
     };
     select: {
       id: true;
+      name: true;
       email: true;
       role: true;
+      status: true;
       createdAt: true;
     };
   }) => Promise<UserRecord>;
@@ -62,7 +73,7 @@ type UsersServiceDeps = {
         action: string;
         entity: string;
         entityId: string;
-        metadata?: Record<string, unknown>;
+        metadata?: unknown;
       };
     }) => Promise<unknown>;
   };
@@ -73,7 +84,9 @@ const userSelect = {
   createdAt: true,
   email: true,
   id: true,
+  name: true,
   role: true,
+  status: true,
 } as const;
 
 function toUser(record: UserRecord): User {
@@ -81,8 +94,9 @@ function toUser(record: UserRecord): User {
     createdAt: record.createdAt,
     email: record.email,
     id: record.id,
+    name: record.name ?? null,
     role: record.role,
-    status: record.role === "VIEWER" ? "INACTIVE" : "ACTIVE",
+    status: record.status,
   };
 }
 
@@ -106,6 +120,7 @@ export function createUsersService(
           email: input.email,
           provider: input.provider ?? "LOCAL",
           role: input.role ?? "EMPLOYEE",
+          status: "ACTIVE",
         },
         select: userSelect,
       });
@@ -165,7 +180,7 @@ export function createUsersService(
 
       const updated = await deps.user.update({
         data: {
-          role: "VIEWER",
+          status: "INACTIVE",
         },
         select: userSelect,
         where: {
@@ -175,6 +190,29 @@ export function createUsersService(
 
       await auditService.createAuditLog({
         action: "USER_DEACTIVATED",
+        actorId: input.actorId,
+        entity: "User",
+        entityId: input.userId,
+      });
+
+      return toUser(updated);
+    },
+
+    async activateUser(input: ActivateUserInput): Promise<User> {
+      assertAdmin(input.actorRole);
+
+      const updated = await deps.user.update({
+        data: {
+          status: "ACTIVE",
+        },
+        select: userSelect,
+        where: {
+          id: input.userId,
+        },
+      });
+
+      await auditService.createAuditLog({
+        action: "USER_ACTIVATED",
         actorId: input.actorId,
         entity: "User",
         entityId: input.userId,
