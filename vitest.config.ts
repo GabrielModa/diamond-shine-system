@@ -9,5 +9,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    include: ["tests/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+    exclude: ["tests/e2e/**"],
   },
 });
