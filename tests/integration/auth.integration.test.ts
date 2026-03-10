@@ -1,11 +1,13 @@
 const {
   bcryptCompareMock,
   bcryptHashMock,
+  getServerSessionMock,
   prismaMock,
   prismaAdapterMock,
 } = vi.hoisted(() => ({
   bcryptCompareMock: vi.fn(),
   bcryptHashMock: vi.fn(),
+  getServerSessionMock: vi.fn(),
   prismaAdapterMock: vi.fn(() => ({
     createUser: vi.fn(),
   })),
@@ -26,6 +28,10 @@ vi.mock("@next-auth/prisma-adapter", () => ({
   PrismaAdapter: prismaAdapterMock,
 }));
 
+vi.mock("next-auth", () => ({
+  getServerSession: getServerSessionMock,
+}));
+
 vi.mock("bcryptjs", () => ({
   default: {
     compare: bcryptCompareMock,
@@ -34,7 +40,7 @@ vi.mock("bcryptjs", () => ({
 }));
 
 import { AuthProvider } from "@prisma/client";
-import { authOptions, authorizeWithCredentials } from "../../src/lib/auth";
+import { authOptions, authorizeWithCredentials, getActiveSessionUser } from "../../src/lib/auth";
 
 describe("Authentication options", () => {
   beforeEach(() => {
@@ -141,5 +147,44 @@ describe("Authentication options", () => {
       },
     });
     expect(signInResult).toBe(true);
+  });
+
+  it("blocks inactive users from accessing authenticated sessions", async () => {
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        id: "u-inactive",
+        role: "EMPLOYEE",
+      },
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "u-inactive",
+      role: "EMPLOYEE",
+      status: "INACTIVE",
+    });
+
+    const result = await getActiveSessionUser();
+
+    expect(result).toBeNull();
+  });
+
+  it("returns active session user when status is ACTIVE", async () => {
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        id: "u-active",
+        role: "SUPERVISOR",
+      },
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "u-active",
+      role: "SUPERVISOR",
+      status: "ACTIVE",
+    });
+
+    const result = await getActiveSessionUser();
+
+    expect(result).toEqual({
+      id: "u-active",
+      role: "SUPERVISOR",
+    });
   });
 });

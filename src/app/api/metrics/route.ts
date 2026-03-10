@@ -1,33 +1,37 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../../lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getActiveSessionUser } from "../../../lib/auth";
+import { withTraceId } from "../../../lib/observability/http";
+import { logError } from "../../../lib/observability/logger";
+import { getTraceId } from "../../../lib/observability/trace";
 import { prisma } from "../../../lib/prisma";
 import { createDashboardServiceFromPrisma } from "../../../modules/dashboard/dashboard.service";
 import type { UserRole } from "../../../types/user";
 
-function toErrorResponse(error: unknown): NextResponse {
+function toErrorResponse(error: unknown, traceId: string): NextResponse {
   const message = error instanceof Error ? error.message : "Unexpected error.";
-  return NextResponse.json({ error: message }, { status: 400 });
+  return withTraceId(NextResponse.json({ error: message }, { status: 400 }), traceId);
 }
 
 async function getSessionUser(): Promise<{ role: UserRole } | null> {
-  const session = await getServerSession(authOptions);
-  const user = session?.user as { role?: UserRole } | undefined;
-
-  if (!user?.role) {
+  const sessionUser = await getActiveSessionUser();
+  if (!sessionUser) {
     return null;
   }
 
   return {
-    role: user.role,
+    role: sessionUser.role,
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const traceId = getTraceId(request.headers);
   try {
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withTraceId(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        traceId,
+      );
     }
 
     const metrics = await createDashboardServiceFromPrisma({
@@ -36,15 +40,19 @@ export async function GET() {
       user: prisma.user,
     }).getMetrics(sessionUser.role);
 
-    return NextResponse.json(metrics);
+    return withTraceId(NextResponse.json(metrics), traceId);
   } catch (error) {
     if (
       error instanceof Error &&
       error.message === "Only admins and supervisors can view dashboard metrics."
     ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return withTraceId(
+        NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+        traceId,
+      );
     }
 
-    return toErrorResponse(error);
+    logError("Metrics API error", error, { route: "GET /api/metrics", traceId });
+    return toErrorResponse(error, traceId);
   }
 }

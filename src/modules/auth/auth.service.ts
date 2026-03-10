@@ -1,6 +1,7 @@
 import { AuthProvider } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
+import { logInfo } from "../../lib/observability/logger";
 import type { UserRole } from "../../types/user";
 
 type RegisteredUser = {
@@ -37,10 +38,13 @@ type UserDelegate = {
       password: string;
       provider: AuthProvider;
     };
+    select: {
+      id: true;
+    };
     where: {
       email: string;
     };
-  }) => Promise<unknown>;
+  }) => Promise<{ id: string }>;
 };
 
 type VerificationTokenDelegate = {
@@ -73,6 +77,24 @@ type VerificationTokenDelegate = {
 };
 
 type AuthenticationServiceDeps = {
+  auditLog: {
+    create: (args: {
+      data: {
+        actorId: string;
+        action: string;
+        entity: string;
+        entityId: string;
+        metadata?: unknown;
+      };
+    }) => Promise<unknown>;
+  };
+  session: {
+    deleteMany: (args: {
+      where: {
+        userId: string;
+      };
+    }) => Promise<unknown>;
+  };
   user: UserDelegate;
   verificationToken: VerificationTokenDelegate;
 };
@@ -118,7 +140,7 @@ export function createAuthenticationService(deps: AuthenticationServiceDeps) {
 
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      return deps.user.create({
+      const created = await deps.user.create({
         data: {
           email,
           name,
@@ -129,6 +151,20 @@ export function createAuthenticationService(deps: AuthenticationServiceDeps) {
         },
         select: REGISTER_SELECT,
       });
+
+      await deps.auditLog.create({
+        data: {
+          action: "USER_CREATED",
+          actorId: created.id,
+          entity: "User",
+          entityId: created.id,
+          metadata: {
+            role: created.role,
+          },
+        },
+      });
+
+      return created;
     },
 
     async requestPasswordReset(input: { baseUrl: string; email: string }) {
@@ -166,7 +202,9 @@ export function createAuthenticationService(deps: AuthenticationServiceDeps) {
         },
       });
 
-      console.log(`Password reset link: ${input.baseUrl}/reset-password/${rawToken}`);
+      logInfo("Password reset link generated", {
+        resetUrl: `${input.baseUrl}/reset-password/${rawToken}`,
+      });
     },
 
     async resetPassword(input: { password: string; token: string }) {
@@ -193,13 +231,31 @@ export function createAuthenticationService(deps: AuthenticationServiceDeps) {
       const email = storedToken.identifier.replace(RESET_TOKEN_PREFIX, "");
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      await deps.user.update({
+      const updatedUser = await deps.user.update({
         data: {
           password: hashedPassword,
           provider: AuthProvider.LOCAL,
         },
+        select: {
+          id: true,
+        },
         where: {
           email,
+        },
+      });
+
+      await deps.session.deleteMany({
+        where: {
+          userId: updatedUser.id,
+        },
+      });
+
+      await deps.auditLog.create({
+        data: {
+          action: "PASSWORD_RESET",
+          actorId: updatedUser.id,
+          entity: "User",
+          entityId: updatedUser.id,
         },
       });
 

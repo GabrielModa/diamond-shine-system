@@ -1,8 +1,10 @@
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
 import { SubmitButton } from "@/src/components/dashboard/SubmitButton";
-import { requireAuthenticatedRoute } from "@/src/lib/auth";
+import { getActiveSessionUser, requireAuthenticatedRoute } from "@/src/lib/auth";
+import { prisma } from "@/src/lib/prisma";
+import { createFeedbackServiceFromPrisma } from "@/src/modules/feedback/feedback.service";
+import type { ListFeedbackInput } from "@/src/modules/feedback/feedback.types";
 
 type FeedbackRow = {
   id: string;
@@ -13,54 +15,39 @@ type FeedbackRow = {
   date: string;
 };
 
-async function getFeedbackRecords(): Promise<FeedbackRow[]> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
-
-  if (!host) {
-    throw new Error("Unable to resolve request host.");
-  }
-
-  const response = await fetch(`${protocol}://${host}/api/feedback`, {
-    cache: "no-store",
-    headers: {
-      cookie: requestHeaders.get("cookie") ?? "",
-    },
+function getFeedbackService() {
+  return createFeedbackServiceFromPrisma({
+    auditLog: prisma.auditLog,
+    feedback: prisma.feedback,
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to load feedback.");
-  }
-
-  return (await response.json()) as FeedbackRow[];
 }
 
-async function callFeedbackApi(path: string, method: "POST" | "PATCH", body: Record<string, unknown>) {
-  "use server";
+async function requireActionUser() {
+  const sessionUser = await getActiveSessionUser();
+  if (!sessionUser) {
+    throw new Error("Unauthorized");
+  }
+  return sessionUser;
+}
 
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+async function getFeedbackRecords(sessionUser: { id: string; role: "ADMIN" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER" }): Promise<FeedbackRow[]> {
+  const input: ListFeedbackInput = {
+    actorRole: sessionUser.role,
+  };
 
-  if (!host) {
-    throw new Error("Unable to resolve request host.");
+  if (sessionUser.role === "EMPLOYEE") {
+    input.employeeId = sessionUser.id;
   }
 
-  const response = await fetch(`${protocol}://${host}${path}`, {
-    body: JSON.stringify(body),
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      cookie: requestHeaders.get("cookie") ?? "",
-    },
-    method,
-  });
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(payload?.error ?? "Failed to process feedback action.");
+  if (sessionUser.role === "SUPERVISOR") {
+    input.reviewerId = sessionUser.id;
   }
+
+  const records = await getFeedbackService().listFeedback(input);
+  return records.map((record) => ({
+    ...record,
+    date: record.date.toISOString(),
+  }));
 }
 
 async function createFeedbackAction(formData: FormData) {
@@ -69,10 +56,14 @@ async function createFeedbackAction(formData: FormData) {
   const employeeId = String(formData.get("employeeId") ?? "");
   const score = Number(formData.get("score") ?? 0);
   const comments = String(formData.get("comments") ?? "");
+  const sessionUser = await requireActionUser();
 
-  await callFeedbackApi("/api/feedback", "POST", {
+  await getFeedbackService().createFeedback({
+    actorId: sessionUser.id,
+    actorRole: sessionUser.role,
     comments,
     employeeId,
+    reviewerId: sessionUser.id,
     score,
   });
   revalidatePath("/feedback");
@@ -84,8 +75,11 @@ async function updateFeedbackAction(formData: FormData) {
   const feedbackId = String(formData.get("feedbackId") ?? "");
   const score = Number(formData.get("score") ?? 0);
   const comments = String(formData.get("comments") ?? "");
+  const sessionUser = await requireActionUser();
 
-  await callFeedbackApi("/api/feedback", "PATCH", {
+  await getFeedbackService().updateFeedback({
+    actorId: sessionUser.id,
+    actorRole: sessionUser.role,
     comments,
     feedbackId,
     score,
@@ -96,7 +90,8 @@ async function updateFeedbackAction(formData: FormData) {
 export default async function FeedbackPage() {
   const { role } = await requireAuthenticatedRoute("/feedback");
   const canCreateOrUpdate = role === "ADMIN" || role === "SUPERVISOR";
-  const feedback = await getFeedbackRecords();
+  const sessionUser = await requireActionUser();
+  const feedback = await getFeedbackRecords(sessionUser);
 
   return (
     <DashboardLayout currentPath="/feedback" role={role} title="Feedback">

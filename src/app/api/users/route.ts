@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../../lib/auth";
+import { getActiveSessionUser } from "../../../lib/auth";
+import { withTraceId } from "../../../lib/observability/http";
+import { logError, logWarn } from "../../../lib/observability/logger";
+import { getTraceId } from "../../../lib/observability/trace";
 import { prisma } from "../../../lib/prisma";
-import { checkRateLimit } from "../../../lib/security/rateLimit";
+import { checkRateLimit, getRequestIp } from "../../../lib/security/rateLimit";
 import { SchemaValidationError, validateSchema } from "../../../lib/security/validate";
 import {
   createUserSchema,
@@ -37,22 +39,29 @@ type CreateUserPayload = {
 function getService() {
   return createUsersServiceFromPrisma({
     auditLog: prisma.auditLog,
+    session: prisma.session,
     user: prisma.user,
   });
 }
 
-function toErrorResponse(error: unknown): NextResponse {
+function toErrorResponse(error: unknown, traceId: string): NextResponse {
   if (error instanceof SchemaValidationError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
+    return withTraceId(
+      NextResponse.json({ error: error.message }, { status: error.status }),
+      traceId,
+    );
   }
 
   const message = error instanceof Error ? error.message : "Unexpected error.";
-  return NextResponse.json({ error: message }, { status: 400 });
+  return withTraceId(NextResponse.json({ error: message }, { status: 400 }), traceId);
 }
 
-function getRateLimitResponse(request: NextRequest | undefined): NextResponse | null {
-  const ip = request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const result = checkRateLimit({
+async function getRateLimitResponse(
+  request: NextRequest | undefined,
+  traceId: string,
+): Promise<NextResponse | null> {
+  const ip = getRequestIp(request?.headers ?? null);
+  const result = await checkRateLimit({
     key: `users:${ip}`,
   });
 
@@ -60,60 +69,69 @@ function getRateLimitResponse(request: NextRequest | undefined): NextResponse | 
     return null;
   }
 
-  return NextResponse.json(
-    { error: "Too many requests. Please try again later." },
-    {
-      headers: {
-        "Retry-After": String(result.retryAfterSeconds),
+  logWarn("Rate limit exceeded", {
+    ip,
+    key: "users",
+    route: "API /api/users",
+    traceId,
+  });
+
+  return withTraceId(
+    NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      {
+        headers: {
+          "Retry-After": String(result.retryAfterSeconds),
+        },
+        status: 429,
       },
-      status: 429,
-    },
+    ),
+    traceId,
   );
 }
 
 async function getSessionUser(): Promise<{ id: string; role: UserRole } | null> {
-  const session = await getServerSession(authOptions);
-  const user = session?.user as { id?: string; role?: UserRole } | undefined;
-
-  if (!user?.id || !user.role) {
-    return null;
-  }
-
-  return {
-    id: user.id,
-    role: user.role,
-  };
+  return getActiveSessionUser();
 }
 
 export async function GET(request: NextRequest) {
+  const traceId = getTraceId(request.headers);
   try {
-    const rateLimitResponse = getRateLimitResponse(request);
+    const rateLimitResponse = await getRateLimitResponse(request, traceId);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withTraceId(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        traceId,
+      );
     }
 
     const result = await getService().listUsers();
-    return NextResponse.json(result);
+    return withTraceId(NextResponse.json(result), traceId);
   } catch (error) {
-    return toErrorResponse(error);
+    logError("Users API error", error, { route: "GET /api/users", traceId });
+    return toErrorResponse(error, traceId);
   }
 }
 
 export async function POST(request: NextRequest) {
+  const traceId = getTraceId(request.headers);
   try {
-    const rateLimitResponse = getRateLimitResponse(request);
+    const rateLimitResponse = await getRateLimitResponse(request, traceId);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withTraceId(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        traceId,
+      );
     }
 
     const payload = validateSchema<CreateUserPayload>(createUserSchema, await request.json());
@@ -121,22 +139,27 @@ export async function POST(request: NextRequest) {
       ...payload,
       actorId: sessionUser.id,
     } as CreateUserInput);
-    return NextResponse.json(result, { status: 201 });
+    return withTraceId(NextResponse.json(result, { status: 201 }), traceId);
   } catch (error) {
-    return toErrorResponse(error);
+    logError("Users API error", error, { route: "POST /api/users", traceId });
+    return toErrorResponse(error, traceId);
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const traceId = getTraceId(request.headers);
   try {
-    const rateLimitResponse = getRateLimitResponse(request);
+    const rateLimitResponse = await getRateLimitResponse(request, traceId);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
 
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withTraceId(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        traceId,
+      );
     }
 
     const payload = validateSchema<UpdateRolePayload | DeactivateUserPayload | ActivateUserPayload>(
@@ -150,7 +173,7 @@ export async function PATCH(request: NextRequest) {
         actorRole: sessionUser.role,
         userId: payload.userId,
       });
-      return NextResponse.json(result);
+      return withTraceId(NextResponse.json(result), traceId);
     }
 
     if (payload.action === "activate") {
@@ -159,7 +182,7 @@ export async function PATCH(request: NextRequest) {
         actorRole: sessionUser.role,
         userId: payload.userId,
       });
-      return NextResponse.json(result);
+      return withTraceId(NextResponse.json(result), traceId);
     }
 
     if (payload.action === "updateRole") {
@@ -169,11 +192,12 @@ export async function PATCH(request: NextRequest) {
         role: payload.role,
         userId: payload.userId,
       });
-      return NextResponse.json(result);
+      return withTraceId(NextResponse.json(result), traceId);
     }
 
     throw new Error("Invalid users action.");
   } catch (error) {
-    return toErrorResponse(error);
+    logError("Users API error", error, { route: "PATCH /api/users", traceId });
+    return toErrorResponse(error, traceId);
   }
 }

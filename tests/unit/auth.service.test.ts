@@ -30,6 +30,12 @@ import { createAuthenticationService } from "../../src/modules/auth/auth.service
 
 function createPrismaMock() {
   return {
+    auditLog: {
+      create: vi.fn(),
+    },
+    session: {
+      deleteMany: vi.fn(),
+    },
     user: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -102,6 +108,17 @@ describe("Authentication service", () => {
       id: "u1",
       role: "EMPLOYEE",
     });
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: "USER_CREATED",
+        actorId: "u1",
+        entity: "User",
+        entityId: "u1",
+        metadata: {
+          role: "EMPLOYEE",
+        },
+      },
+    });
   });
 
   it("blocks registration when the email already exists", async () => {
@@ -165,7 +182,7 @@ describe("Authentication service", () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
-  it("updates the password and invalidates the token after reset", async () => {
+  it("updates the password, invalidates sessions, and removes the token after reset", async () => {
     const prisma = createPrismaMock();
     const service = createAuthenticationService(prisma as never);
 
@@ -178,6 +195,9 @@ describe("Authentication service", () => {
       token: "hashed-token",
     });
     bcryptHashMock.mockResolvedValue("new-hashed-password");
+    prisma.user.update.mockResolvedValue({
+      id: "u1",
+    });
 
     await service.resetPassword({
       password: "new-password",
@@ -190,8 +210,16 @@ describe("Authentication service", () => {
         password: "new-hashed-password",
         provider: "LOCAL",
       },
+      select: {
+        id: true,
+      },
       where: {
         email: "user@example.com",
+      },
+    });
+    expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+      where: {
+        userId: "u1",
       },
     });
     expect(prisma.verificationToken.delete).toHaveBeenCalledTimes(1);
