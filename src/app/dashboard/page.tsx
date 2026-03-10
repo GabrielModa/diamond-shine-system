@@ -1,14 +1,18 @@
 import Link from "next/link";
-import { getServerSession } from "next-auth";
 import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
-import { authOptions } from "@/src/lib/auth";
+import { requireAuthenticatedRoute } from "@/src/lib/auth";
+import { canAccessRoute } from "@/src/lib/permissions";
 import { FeedbackChart } from "@/src/components/metrics/FeedbackChart";
 import { MetricsCards } from "@/src/components/metrics/MetricsCards";
 import { SuppliesChart } from "@/src/components/metrics/SuppliesChart";
-import type { UserRole } from "@/src/types/user";
+import type { AppRoute } from "@/src/types/permissions";
 
-const CARDS = [
+const CARDS: Array<{
+  description: string;
+  href: AppRoute;
+  title: string;
+}> = [
   {
     href: "/users",
     description: "Manage roles and status for platform users.",
@@ -62,13 +66,13 @@ async function getDashboardMetrics(): Promise<DashboardMetrics> {
 }
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user?.role as UserRole | undefined) ?? "VIEWER";
+  const { role } = await requireAuthenticatedRoute("/dashboard");
   const canAccessMetrics = role === "ADMIN" || role === "SUPERVISOR";
   const metrics = canAccessMetrics ? await getDashboardMetrics() : null;
+  const visibleCards = CARDS.filter((card) => canAccessRoute(role, card.href));
 
   return (
-    <DashboardLayout currentPath="/dashboard" title="Dashboard">
+    <DashboardLayout currentPath="/dashboard" role={role} title="Dashboard">
       {metrics ? (
         <>
           <MetricsCards
@@ -84,7 +88,7 @@ export default async function DashboardPage() {
         </>
       ) : null}
       <section className="grid gap-4 md:grid-cols-3">
-        {CARDS.map((card) => (
+        {visibleCards.map((card) => (
           <Link
             key={card.href}
             href={card.href}

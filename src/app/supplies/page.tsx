@@ -1,10 +1,8 @@
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
 import { headers } from "next/headers";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
 import { SubmitButton } from "@/src/components/dashboard/SubmitButton";
-import { authOptions } from "@/src/lib/auth";
-import type { UserRole } from "@/src/types/user";
+import { requireAuthenticatedRoute } from "@/src/lib/auth";
 
 type SupplyRow = {
   id: string;
@@ -106,14 +104,13 @@ async function rejectSupplyAction(formData: FormData) {
 }
 
 export default async function SuppliesPage() {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user?.role as UserRole | undefined) ?? "VIEWER";
+  const { role } = await requireAuthenticatedRoute("/supplies");
   const canCreate = role === "ADMIN" || role === "EMPLOYEE";
   const canReview = role === "ADMIN" || role === "SUPERVISOR";
   const supplies = await getSupplies();
 
   return (
-    <DashboardLayout currentPath="/supplies" title="Supplies">
+    <DashboardLayout currentPath="/supplies" role={role} title="Supplies">
       {canCreate ? (
         <form
           action={createSupplyAction}

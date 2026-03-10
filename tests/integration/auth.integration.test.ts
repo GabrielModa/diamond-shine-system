@@ -41,39 +41,17 @@ describe("Authentication options", () => {
     vi.clearAllMocks();
   });
 
-  it("creates a local account on first credentials login", async () => {
+  it("rejects credentials login when the user does not exist", async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
-    bcryptHashMock.mockResolvedValue("hashed-password");
-    prismaMock.user.create.mockResolvedValue({
-      email: "new.user@example.com",
-      id: "u1",
-      role: "EMPLOYEE",
-    });
 
     const result = await authorizeWithCredentials({
       email: "new.user@example.com",
       password: "plain-password",
     });
 
-    expect(bcryptHashMock).toHaveBeenCalledWith("plain-password", 12);
-    expect(prismaMock.user.create).toHaveBeenCalledWith({
-      data: {
-        email: "new.user@example.com",
-        password: "hashed-password",
-        provider: "LOCAL",
-        role: "EMPLOYEE",
-      },
-      select: {
-        email: true,
-        id: true,
-        role: true,
-      },
-    });
-    expect(result).toMatchObject({
-      email: "new.user@example.com",
-      id: "u1",
-      role: "EMPLOYEE",
-    });
+    expect(bcryptHashMock).not.toHaveBeenCalled();
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+    expect(result).toBeNull();
   });
 
   it("rejects credentials login with invalid password", async () => {
@@ -91,6 +69,16 @@ describe("Authentication options", () => {
     });
 
     expect(bcryptCompareMock).toHaveBeenCalledWith("wrong-password", "stored-hash");
+    expect(result).toBeNull();
+  });
+
+  it("rejects credentials login with empty credentials", async () => {
+    const result = await authorizeWithCredentials({
+      email: "  ",
+      password: "",
+    });
+
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
     expect(result).toBeNull();
   });
 

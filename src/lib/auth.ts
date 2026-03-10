@@ -4,6 +4,9 @@ import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import { redirect } from "next/navigation";
+import { canAccessRoute } from "./permissions";
+import type { AppRoute } from "../types/permissions";
 import type { UserRole } from "../types/user";
 import { prisma } from "./prisma";
 
@@ -33,22 +36,7 @@ export async function authorizeWithCredentials(credentials?: {
   });
 
   if (!existingUser) {
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const createdUser = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        provider: AuthProvider.LOCAL,
-        role: DEFAULT_ROLE,
-      },
-      select: {
-        email: true,
-        id: true,
-        role: true,
-      },
-    });
-
-    return createdUser;
+    return null;
   }
 
   if (!existingUser.password) {
@@ -167,3 +155,23 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
 };
+
+export async function requireAuthenticatedRoute(route: AppRoute) {
+  const { getServerSession } = await import("next-auth");
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const role = (session.user.role as UserRole | undefined) ?? DEFAULT_ROLE;
+
+  if (!canAccessRoute(role, route)) {
+    redirect("/dashboard");
+  }
+
+  return {
+    role,
+    session,
+  };
+}

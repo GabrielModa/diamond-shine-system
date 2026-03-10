@@ -1,1 +1,1 @@
-export type ModuleKey = "supplies" | "feedback" | "dashboard";
+export type AppRoute = "/dashboard" | "/users" | "/supplies" | "/feedback";
