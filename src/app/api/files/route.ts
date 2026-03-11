@@ -1,5 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveSessionUser } from "../../../lib/auth";
 import { withTraceId } from "../../../lib/observability/http";
@@ -16,6 +17,27 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getActiveSessionUser();
     if (!user) return withTraceId(NextResponse.json({ error: "Unauthorized" }, { status: 401 }), traceId);
+
+    const { searchParams } = new URL(request.url);
+    const filename = searchParams.get("filename");
+
+    if (filename) {
+      const safeFilename = path.basename(filename);
+      const filePath = path.join(process.cwd(), "uploads", safeFilename);
+      if (!existsSync(filePath)) {
+        return withTraceId(NextResponse.json({ error: "File not found." }, { status: 404 }), traceId);
+      }
+
+      const fileBuffer = await readFile(filePath);
+      return withTraceId(new NextResponse(fileBuffer, {
+        status: 200,
+        headers: {
+          "Content-Disposition": `attachment; filename="${safeFilename}"`,
+          "Content-Type": "application/octet-stream",
+        },
+      }), traceId);
+    }
+
     return withTraceId(NextResponse.json(await getService().listFiles()), traceId);
   } catch (error) {
     return withTraceId(NextResponse.json({ error: error instanceof Error ? error.message : "Unexpected error." }, { status: 400 }), traceId);
@@ -51,7 +73,7 @@ export async function POST(request: NextRequest) {
       const bytes = await file.arrayBuffer();
       await writeFile(savedPath, Buffer.from(bytes));
 
-      return registerMetadata(user, file.name, file.type || "application/octet-stream", file.size, traceId);
+      return registerMetadata(user, safeName, file.type || "application/octet-stream", file.size, traceId);
     }
 
     const payload = validateSchema(registerFileSchema, await request.json());

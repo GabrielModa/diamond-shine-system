@@ -3,8 +3,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Modal } from "@/src/components/ui/Modal";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
-import { Table, TableContainer } from "@/src/components/ui/Table";
-import { getStatusTone, readApiError } from "./page-state.utils";
+import { readApiError } from "./page-state.utils";
 
 type UserRole = "ADMIN" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER";
 type FeedbackRow = { id: string; employeeId: string; reviewerId: string; score: number; comments: string; date: string };
@@ -19,7 +18,6 @@ export function FeedbackPageClient({ currentUserId, role }: { currentUserId: str
   const [editing, setEditing] = useState<FeedbackRow | null>(null);
 
   const canReview = role === "ADMIN" || role === "SUPERVISOR";
-
   const history = useMemo(() => rows.filter((row) => row.employeeId === currentUserId), [currentUserId, rows]);
 
   const load = async () => {
@@ -39,7 +37,9 @@ export function FeedbackPageClient({ currentUserId, role }: { currentUserId: str
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
   const submitFeedback = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -78,13 +78,14 @@ export function FeedbackPageClient({ currentUserId, role }: { currentUserId: str
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {canReview ? (
-        <form onSubmit={submitFeedback} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-4">
-          <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="Employee ID" className="rounded border px-3 py-2 text-sm" required />
-          <input value={score} onChange={(e) => setScore(Number(e.target.value))} type="number" min={1} max={10} className="rounded border px-3 py-2 text-sm" required />
-          <input value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Comments" className="rounded border px-3 py-2 text-sm" required />
-          <button className="rounded bg-slate-900 px-3 py-2 text-sm text-white">Submit Feedback</button>
+        <form onSubmit={submitFeedback} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Create performance feedback</h2>
+          <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="Employee ID" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+          <input value={score} onChange={(e) => setScore(Number(e.target.value))} type="number" min={1} max={10} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+          <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Review comments" rows={3} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+          <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white">Submit feedback</button>
         </form>
       ) : null}
 
@@ -92,13 +93,17 @@ export function FeedbackPageClient({ currentUserId, role }: { currentUserId: str
       {loading ? <p className="rounded-xl bg-white p-4 text-sm text-slate-500">Loading feedback...</p> : null}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Employee feedback history</h2>
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Feedback history</h2>
         {!history.length ? <p className="text-sm text-slate-500">No feedback history available.</p> : (
           <ul className="space-y-2">
             {history.map((entry) => (
-              <li key={entry.id} className="rounded border border-slate-200 p-3">
-                <div className="flex items-center justify-between"><span className="text-sm text-slate-900">Score {entry.score}</span><StatusBadge tone={getStatusTone("COMPLETED")}>Reviewed</StatusBadge></div>
+              <li key={entry.id} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">Score {entry.score}</p>
+                  <StatusBadge tone="success">Reviewed</StatusBadge>
+                </div>
                 <p className="mt-1 text-sm text-slate-600">{entry.comments}</p>
+                <p className="mt-1 text-xs text-slate-500">{new Date(entry.date).toLocaleDateString()}</p>
               </li>
             ))}
           </ul>
@@ -106,15 +111,22 @@ export function FeedbackPageClient({ currentUserId, role }: { currentUserId: str
       </section>
 
       {canReview ? (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-slate-900">Supervisor review panel</h2>
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-slate-900">Supervisor review queue</h2>
           {!rows.length ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">No feedback records found.</p> : (
-            <TableContainer>
-              <Table>
-                <thead className="bg-slate-50 text-slate-600"><tr><th className="px-4 py-2">Employee</th><th>Reviewer</th><th>Score</th><th>Comments</th><th>Date</th><th>Action</th></tr></thead>
-                <tbody>{rows.map((row) => <tr key={row.id} className="border-t"><td className="px-4 py-2">{row.employeeId}</td><td>{row.reviewerId}</td><td>{row.score}</td><td>{row.comments}</td><td>{new Date(row.date).toLocaleDateString()}</td><td><button type="button" onClick={() => setEditing(row)} className="rounded bg-slate-800 px-2 py-1 text-xs text-white">Review</button></td></tr>)}</tbody>
-              </Table>
-            </TableContainer>
+            <ul className="space-y-2">
+              {rows.map((row) => (
+                <li key={row.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Employee {row.employeeId}</p>
+                  <p className="text-xs text-slate-600">Reviewer {row.reviewerId}</p>
+                  <p className="mt-2 text-sm text-slate-700">{row.comments}</p>
+                  <div className="mt-3 flex items-center justify-between">
+                    <StatusBadge tone="info">Score {row.score}</StatusBadge>
+                    <button type="button" onClick={() => setEditing(row)} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Edit review</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       ) : null}
@@ -129,11 +141,11 @@ function ReviewModal({ row, onClose, onSave }: { row: FeedbackRow; onClose: () =
   const [comments, setComments] = useState(row.comments);
 
   return (
-    <Modal title="Review feedback" onClose={onClose}>
+    <Modal title="Edit feedback review" onClose={onClose}>
       <div className="space-y-3">
-        <input value={score} onChange={(e) => setScore(Number(e.target.value))} type="number" min={1} max={10} className="w-full rounded border px-3 py-2 text-sm" />
-        <textarea value={comments} onChange={(e) => setComments(e.target.value)} className="w-full rounded border px-3 py-2 text-sm" rows={4} />
-        <button type="button" onClick={() => void onSave(row.id, score, comments)} className="w-full rounded bg-slate-900 px-3 py-2 text-sm text-white">Save review</button>
+        <input value={score} onChange={(e) => setScore(Number(e.target.value))} type="number" min={1} max={10} className="w-full rounded-lg border px-3 py-2 text-sm" />
+        <textarea value={comments} onChange={(e) => setComments(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" rows={4} />
+        <button type="button" onClick={() => void onSave(row.id, score, comments)} className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm text-white">Save review</button>
       </div>
     </Modal>
   );
