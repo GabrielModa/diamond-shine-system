@@ -5,7 +5,7 @@ export function getStatusTone(status: string): BadgeTone {
     return "success";
   }
 
-  if (status === "PENDING" || status === "QUEUED") {
+  if (status === "PENDING" || status === "QUEUED" || status === "EMAIL_SENT") {
     return "warning";
   }
 
@@ -23,6 +23,10 @@ export function getSupplyWorkflowState(status: string): string {
 
   if (status === "APPROVED") {
     return "Approved, waiting completion";
+  }
+
+  if (status === "EMAIL_SENT") {
+    return "Client has been notified by email";
   }
 
   if (status === "COMPLETED") {
