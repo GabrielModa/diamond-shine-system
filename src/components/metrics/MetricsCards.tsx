@@ -1,15 +1,15 @@
 type MetricsCardsProps = {
-  averageFeedbackScore: number;
   pendingSupplies: number;
-  totalFeedback: number;
-  totalUsers: number;
+  emailSentSupplies: number;
+  completedSupplies: number;
+  averageFeedbackScore: number;
 };
 
 const CARD_CONFIG = [
-  { key: "totalUsers", label: "Total Users" },
   { key: "pendingSupplies", label: "Pending Supplies" },
-  { key: "averageFeedbackScore", label: "Average Feedback Score" },
-  { key: "totalFeedback", label: "Total Feedback" },
+  { key: "emailSentSupplies", label: "Email Sent Supplies" },
+  { key: "completedSupplies", label: "Completed Supplies" },
+  { key: "averageFeedbackScore", label: "Feedback Score" },
 ] as const;
 
 export function MetricsCards(props: MetricsCardsProps) {

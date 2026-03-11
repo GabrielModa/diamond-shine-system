@@ -53,25 +53,41 @@ export default async function DashboardPage() {
         <>
           <MetricsCards
             averageFeedbackScore={metrics.averageFeedbackScore}
-            pendingSupplies={metrics.pendingSupplies}
-            totalFeedback={metrics.totalFeedback}
-            totalUsers={metrics.totalUsers}
+            completedSupplies={metrics.completed}
+            emailSentSupplies={metrics.emailSent}
+            pendingSupplies={metrics.pending}
           />
           <section className="mb-6 grid gap-4 lg:grid-cols-2">
             <SuppliesChart data={metrics.suppliesByDepartment} />
             <FeedbackChart data={metrics.feedbackScoreTrend} />
           </section>
 
+
+          <section className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-900">Recent requests</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {metrics.recentRequests.slice(0, 6).map((request) => (
+                <article key={request.id} className="rounded border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-sm font-medium text-slate-900">{request.item}</p>
+                  <p className="text-xs text-slate-600">{request.priority} · {request.status}</p>
+                  <p className="text-xs text-slate-500">{new Date(request.requestDate).toLocaleString()}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
           <section className="mb-6 grid gap-4 md:grid-cols-2">
             <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900">Supply stats</h3>
-              <p className="mt-2 text-sm text-slate-600">Pending requests: {metrics.pendingSupplies}</p>
-              <p className="text-sm text-slate-600">Departments tracked: {metrics.suppliesByDepartment.length}</p>
+              <p className="mt-2 text-sm text-slate-600">Pending requests: {metrics.pending}</p>
+              <p className="text-sm text-slate-600">Email sent: {metrics.emailSent}</p>
+              <p className="text-sm text-slate-600">Completed: {metrics.completed}</p>
             </article>
             <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900">Feedback stats</h3>
               <p className="mt-2 text-sm text-slate-600">Total feedback: {metrics.totalFeedback}</p>
               <p className="text-sm text-slate-600">Average score: {metrics.averageFeedbackScore}</p>
+              <p className="text-sm text-slate-600">Most requested: {metrics.mostRequestedProduct ?? "-"}</p>
             </article>
           </section>
         </>

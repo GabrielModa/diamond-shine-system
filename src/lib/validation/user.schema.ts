@@ -22,4 +22,14 @@ export const activateUserSchema = z.object({
   userId: z.string().min(1),
 });
 
-export const patchUserSchema = z.union([updateUserRoleSchema, deactivateUserSchema, activateUserSchema]);
+export const resetUserPasswordSchema = z.object({
+  action: z.literal("resetPassword"),
+  userId: z.string().min(1),
+});
+
+export const patchUserSchema = z.union([
+  updateUserRoleSchema,
+  deactivateUserSchema,
+  activateUserSchema,
+  resetUserPasswordSchema,
+]);

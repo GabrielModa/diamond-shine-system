@@ -75,8 +75,8 @@ export function FilesPageClient() {
       {!loading && rows.length ? (
         <TableContainer>
           <Table>
-            <thead className="bg-slate-50 text-slate-600"><tr><th className="px-4 py-2">Name</th><th>Type</th><th>Size</th><th>Created</th></tr></thead>
-            <tbody>{rows.map((r) => <tr key={r.id} className="border-t"><td className="px-4 py-2">{r.filename}</td><td>{r.mimeType}</td><td>{r.sizeBytes}</td><td>{new Date(r.createdAt).toLocaleString()}</td></tr>)}</tbody>
+            <thead className="bg-slate-50 text-slate-600"><tr><th className="px-4 py-2">Name</th><th>Type</th><th>Size</th><th>Created</th><th>Download</th></tr></thead>
+            <tbody>{rows.map((r) => <tr key={r.id} className="border-t"><td className="px-4 py-2">{r.filename}</td><td>{r.mimeType}</td><td>{r.sizeBytes}</td><td>{new Date(r.createdAt).toLocaleString()}</td><td><a className="text-blue-700 underline" href={`/api/files?filename=${encodeURIComponent(r.filename)}`}>Download</a></td></tr>)}</tbody>
           </Table>
         </TableContainer>
       ) : null}

@@ -30,8 +30,10 @@ type UpdateFeedbackPayload = {
 
 function getService() {
   return createFeedbackServiceFromPrisma({
+    activity: prisma.activity,
     auditLog: prisma.auditLog,
     feedback: prisma.feedback,
+    notification: prisma.notification,
   });
 }
 

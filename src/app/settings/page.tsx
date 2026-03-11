@@ -7,7 +7,7 @@ export default async function SettingsPage() {
 
   return (
     <DashboardLayout currentPath="/settings" role={role} title="Settings">
-      <SettingsPageClient />
+      <SettingsPageClient role={role} />
     </DashboardLayout>
   );
 }
