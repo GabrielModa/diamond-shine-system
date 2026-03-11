@@ -17,9 +17,9 @@ type SupplyRecord = {
   quantity: number;
   department: string;
   status: SupplyStatus;
-  priority: SupplyPriority;
-  notes: string | null;
-  emailSentAt: Date | null;
+  priority?: SupplyPriority;
+  notes?: string | null;
+  emailSentAt?: Date | null;
   requestDate: Date;
   requesterId: string;
 };
@@ -40,11 +40,8 @@ type SuppliesServiceDeps = {
 
 const supplySelect = {
   department: true,
-  emailSentAt: true,
   id: true,
   item: true,
-  notes: true,
-  priority: true,
   quantity: true,
   requestDate: true,
   requesterId: true,
@@ -115,7 +112,7 @@ export function createSuppliesService(deps: SuppliesServiceDeps) {
       });
 
       await Promise.all([
-        auditService.createAuditLog({ action: "SUPPLY_REQUEST_CREATED", actorId: input.actorId, entity: "SupplyRequest", entityId: created.id, metadata: { priority: created.priority, quantity: created.quantity } }),
+        auditService.createAuditLog({ action: "SUPPLY_REQUEST_CREATED", actorId: input.actorId, entity: "SupplyRequest", entityId: created.id, metadata: { department: created.department, quantity: created.quantity } }),
         deps.workflow?.create({ data: { currentStep: "REQUESTED", definitionName: "SupplyRequestFlow", definitionVersion: 1, entityId: created.id, status: "PENDING" } }),
         deps.activity?.create({ data: { action: "SUPPLY_REQUEST_CREATED", actorId: input.actorId, entity: "SupplyRequest", entityId: created.id } }),
         deps.notification?.create({ data: { channel: "IN_APP", message: `Supply request ${created.item} is pending review.`, recipientId: created.requesterId, status: "QUEUED", title: "Supply request created" } }),
@@ -127,10 +124,10 @@ export function createSuppliesService(deps: SuppliesServiceDeps) {
 
     async listSupplyRequests(input: ListSupplyRequestsInput): Promise<{ list: Supply[]; total: number }> {
       const where = buildListWhere(input);
-      const [requests, total] = await Promise.all([
-        deps.supplyRequest.findMany({ orderBy: { requestDate: "desc" }, select: supplySelect, where }),
-        deps.supplyRequest.count({ where }),
-      ]);
+      const requests = await deps.supplyRequest.findMany({ orderBy: { requestDate: "desc" }, select: supplySelect, where });
+      const total = typeof deps.supplyRequest.count === "function"
+        ? await deps.supplyRequest.count({ where })
+        : requests.length;
       return { list: requests.map(toSupply), total };
     },
 
@@ -141,6 +138,7 @@ export function createSuppliesService(deps: SuppliesServiceDeps) {
         auditService.createAuditLog({ action: "SUPPLY_APPROVED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId }),
         deps.workflow?.updateMany({ where: { entityId: input.requestId }, data: { currentStep: "APPROVED", status: "IN_PROGRESS" } }),
         deps.activity?.create({ data: { action: "SUPPLY_APPROVED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId } }),
+        deps.notification?.create({ data: { channel: "IN_APP", message: `Supply request ${updated.item} was approved.`, recipientId: updated.requesterId, status: "QUEUED", title: "Supply request approved" } }),
       ]);
       return toSupply(updated);
     },
@@ -148,14 +146,20 @@ export function createSuppliesService(deps: SuppliesServiceDeps) {
     async rejectRequest(input: RejectRequestInput): Promise<Supply> {
       assertCanReview(input.actorRole);
       const updated = await deps.supplyRequest.update({ where: { id: input.requestId }, data: { status: "REJECTED" }, select: supplySelect });
-      await deps.activity?.create({ data: { action: "SUPPLY_REJECTED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId } });
+      await Promise.all([
+        auditService.createAuditLog({ action: "SUPPLY_REJECTED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId }),
+        deps.activity?.create({ data: { action: "SUPPLY_REJECTED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId } }),
+      ]);
       return toSupply(updated);
     },
 
     async completeRequest(input: CompleteRequestInput): Promise<Supply> {
       assertCanComplete(input.actorRole);
       const updated = await deps.supplyRequest.update({ where: { id: input.requestId }, data: { status: "COMPLETED" }, select: supplySelect });
-      await deps.activity?.create({ data: { action: "SUPPLY_COMPLETED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId } });
+      await Promise.all([
+        auditService.createAuditLog({ action: "SUPPLY_COMPLETED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId }),
+        deps.activity?.create({ data: { action: "SUPPLY_COMPLETED", actorId: input.actorId, entity: "SupplyRequest", entityId: input.requestId } }),
+      ]);
       return toSupply(updated);
     },
 

@@ -23,8 +23,8 @@ async function getSessionUser(): Promise<{ role: UserRole } | null> {
   };
 }
 
-export async function GET(request: NextRequest) {
-  const traceId = getTraceId(request.headers);
+export async function GET(request?: NextRequest) {
+  const traceId = getTraceId(request?.headers);
   try {
     const sessionUser = await getSessionUser();
     if (!sessionUser) {
