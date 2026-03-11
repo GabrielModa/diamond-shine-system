@@ -7,6 +7,7 @@ CREATE TABLE "User" (
     "image" TEXT,
     "password" TEXT,
     "role" TEXT NOT NULL DEFAULT 'EMPLOYEE',
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
     "provider" TEXT NOT NULL DEFAULT 'LOCAL',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -45,6 +46,30 @@ CREATE TABLE "VerificationToken" (
 );
 
 -- CreateTable
+CREATE TABLE "SupplyRequest" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "item" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+    "department" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "requestDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "requesterId" TEXT NOT NULL,
+    CONSTRAINT "SupplyRequest_requesterId_fkey" FOREIGN KEY ("requesterId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Feedback" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "employeeId" TEXT NOT NULL,
+    "reviewerId" TEXT NOT NULL,
+    "score" INTEGER NOT NULL,
+    "comments" TEXT NOT NULL,
+    "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Feedback_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Feedback_reviewerId_fkey" FOREIGN KEY ("reviewerId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "AuditLog" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "actorId" TEXT NOT NULL,
@@ -53,6 +78,15 @@ CREATE TABLE "AuditLog" (
     "entityId" TEXT NOT NULL,
     "metadata" JSONB,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "RateLimitBucket" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "count" INTEGER NOT NULL,
+    "resetAt" DATETIME NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateIndex
