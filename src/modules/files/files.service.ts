@@ -4,6 +4,7 @@ import type { FileRecord, RegisterFileInput } from "./files.types";
 type FilesDeps = {
   file: {
     create: (args: { data: { filename: string; mimeType: string; sizeBytes: number; uploadedBy: string } }) => Promise<FileRecord>;
+    findMany: (args: { orderBy: { createdAt: "desc" }; take: number }) => Promise<FileRecord[]>;
   };
 };
 
@@ -15,6 +16,13 @@ function assertCanUploadFiles(role: UserRole) {
 
 export function createFilesService(deps: FilesDeps) {
   return {
+    async listFiles(): Promise<FileRecord[]> {
+      return deps.file.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+    },
+
     async registerUpload(input: RegisterFileInput): Promise<FileRecord> {
       assertCanUploadFiles(input.actorRole);
 

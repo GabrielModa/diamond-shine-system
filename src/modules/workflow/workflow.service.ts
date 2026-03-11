@@ -16,6 +16,7 @@ type WorkflowInstanceRecord = {
 
 type WorkflowDeps = {
   workflowInstance: {
+    findMany: (args: { where?: { entityId?: string }; orderBy: { updatedAt: "desc" }; take: number }) => Promise<WorkflowInstanceRecord[]>;
     create: (args: {
       data: {
         entityId: string;
@@ -73,6 +74,16 @@ export function createWorkflowService(deps: WorkflowDeps) {
       });
 
       return toWorkflowInstance(created);
+    },
+
+    async listInstances(entityId?: string) {
+      const rows = await deps.workflowInstance.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 50,
+        where: entityId ? { entityId } : undefined,
+      });
+
+      return rows.map(toWorkflowInstance);
     },
 
     async transitionStep(input: TransitionWorkflowStepInput) {

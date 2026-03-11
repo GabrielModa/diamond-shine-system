@@ -6,6 +6,7 @@ type ReportRecord = Report;
 type ReportsDeps = {
   report: {
     create: (args: { data: { reportKey: string; format: Report["format"]; requestedBy: string; status: "PENDING"; filters?: Record<string, string | number | boolean> } }) => Promise<ReportRecord>;
+    findMany: (args: { orderBy: { createdAt: "desc" }; take: number }) => Promise<ReportRecord[]>;
   };
 };
 
@@ -17,6 +18,13 @@ function assertCanGenerateReports(role: UserRole) {
 
 export function createReportsService(deps: ReportsDeps) {
   return {
+    async listReports(): Promise<Report[]> {
+      return deps.report.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+    },
+
     async generateReport(input: GenerateReportInput): Promise<Report> {
       assertCanGenerateReports(input.actorRole);
 

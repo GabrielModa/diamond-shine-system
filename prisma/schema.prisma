@@ -8,21 +8,21 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  name          String?
-  email         String         @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          Role           @default(EMPLOYEE)
-  status        UserStatus     @default(ACTIVE)
-  provider      AuthProvider   @default(LOCAL)
-  createdAt     DateTime       @default(now())
-  accounts      Account[]
-  sessions      Session[]
-  supplyRequests SupplyRequest[] @relation("SupplyRequester")
-  feedbackAuthored Feedback[]    @relation("FeedbackReviewer")
-  feedbackReceived Feedback[]    @relation("FeedbackEmployee")
+  id               String            @id @default(uuid())
+  name             String?
+  email            String            @unique
+  emailVerified    DateTime?
+  image            String?
+  password         String?
+  role             Role              @default(EMPLOYEE)
+  status           UserStatus        @default(ACTIVE)
+  provider         AuthProvider      @default(LOCAL)
+  createdAt        DateTime          @default(now())
+  accounts         Account[]
+  sessions         Session[]
+  supplyRequests   SupplyRequest[]   @relation("SupplyRequester")
+  feedbackAuthored Feedback[]        @relation("FeedbackReviewer")
+  feedbackReceived Feedback[]        @relation("FeedbackEmployee")
 }
 
 model Account {
@@ -83,6 +83,42 @@ enum SupplyStatus {
   COMPLETED
 }
 
+enum WorkflowStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  READ
+}
+
+enum JobStatus {
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReportStatus {
+  PENDING
+  GENERATED
+}
+
+enum ReportFormat {
+  CSV
+  JSON
+  PDF
+}
+
 model SupplyRequest {
   id          String       @id @default(uuid())
   item        String
@@ -113,6 +149,76 @@ model AuditLog {
   entityId  String
   metadata  Json?
   createdAt DateTime @default(now())
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model File {
+  id         String   @id @default(uuid())
+  filename   String
+  mimeType   String
+  sizeBytes  Int
+  uploadedBy String
+  createdAt  DateTime @default(now())
+}
+
+model Job {
+  id        String   @id @default(uuid())
+  key       String
+  payload   Json?
+  runAt     DateTime
+  status    JobStatus @default(SCHEDULED)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id          String              @id @default(uuid())
+  recipientId String
+  title       String
+  message     String
+  channel     NotificationChannel
+  status      NotificationStatus  @default(QUEUED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  reportKey   String
+  format      ReportFormat
+  requestedBy String
+  status      ReportStatus @default(PENDING)
+  filters     Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedBy String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model WorkflowInstance {
+  id                String         @id @default(uuid())
+  entityId          String
+  currentStep       String
+  status            WorkflowStatus @default(PENDING)
+  definitionName    String
+  definitionVersion Int
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 }
 
 model RateLimitBucket {

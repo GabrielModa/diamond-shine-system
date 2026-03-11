@@ -9,6 +9,7 @@ type SettingsDeps = {
       update: { value: string; updatedBy: string };
     }) => Promise<Setting>;
     findUnique: (args: { where: { key: string } }) => Promise<Setting | null>;
+    findMany: (args: { orderBy: { updatedAt: "desc" }; take: number }) => Promise<Setting[]>;
   };
 };
 
@@ -36,6 +37,13 @@ export function createSettingsService(deps: SettingsDeps) {
         where: {
           key: input.key,
         },
+      });
+    },
+
+    async listSettings(): Promise<Setting[]> {
+      return deps.setting.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 100,
       });
     },
 

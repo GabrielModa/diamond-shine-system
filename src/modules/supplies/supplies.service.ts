@@ -88,6 +88,48 @@ type SuppliesServiceDeps = {
     }) => Promise<unknown>;
   };
   supplyRequest: SupplyRequestDelegate;
+  workflow?: {
+    create: (args: {
+      data: {
+        entityId: string;
+        currentStep: string;
+        definitionName: string;
+        definitionVersion: number;
+        status: "PENDING";
+      };
+    }) => Promise<unknown>;
+    updateMany: (args: {
+      where: {
+        entityId: string;
+      };
+      data: {
+        currentStep: string;
+        status: "IN_PROGRESS" | "COMPLETED" | "REJECTED";
+      };
+    }) => Promise<unknown>;
+  };
+  activity?: {
+    create: (args: {
+      data: {
+        actorId: string;
+        action: string;
+        entity: string;
+        entityId: string;
+        metadata?: unknown;
+      };
+    }) => Promise<unknown>;
+  };
+  notification?: {
+    create: (args: {
+      data: {
+        recipientId: string;
+        title: string;
+        message: string;
+        channel: "IN_APP";
+        status: "QUEUED";
+      };
+    }) => Promise<unknown>;
+  };
 };
 
 const supplySelect = {
@@ -153,9 +195,7 @@ function buildListWhere(input: ListSupplyRequestsInput): {
   throw new Error("Viewers cannot list supply requests.");
 }
 
-export function createSuppliesService(
-  deps: SuppliesServiceDeps,
-) {
+export function createSuppliesService(deps: SuppliesServiceDeps) {
   const auditService = createAuditService({
     auditLog: deps.auditLog,
   });
@@ -175,16 +215,48 @@ export function createSuppliesService(
         select: supplySelect,
       });
 
-      await auditService.createAuditLog({
-        action: "SUPPLY_REQUEST_CREATED",
-        actorId: input.actorId,
-        entity: "SupplyRequest",
-        entityId: created.id,
-        metadata: {
-          department: created.department,
-          quantity: created.quantity,
-        },
-      });
+      await Promise.all([
+        auditService.createAuditLog({
+          action: "SUPPLY_REQUEST_CREATED",
+          actorId: input.actorId,
+          entity: "SupplyRequest",
+          entityId: created.id,
+          metadata: {
+            department: created.department,
+            quantity: created.quantity,
+          },
+        }),
+        deps.workflow?.create({
+          data: {
+            currentStep: "REQUESTED",
+            definitionName: "SupplyRequestFlow",
+            definitionVersion: 1,
+            entityId: created.id,
+            status: "PENDING",
+          },
+        }),
+        deps.activity?.create({
+          data: {
+            action: "SUPPLY_REQUEST_CREATED",
+            actorId: input.actorId,
+            entity: "SupplyRequest",
+            entityId: created.id,
+            metadata: {
+              department: created.department,
+              quantity: created.quantity,
+            },
+          },
+        }),
+        deps.notification?.create({
+          data: {
+            channel: "IN_APP",
+            message: `Supply request ${created.item} is pending review.`,
+            recipientId: created.requesterId,
+            status: "QUEUED",
+            title: "Supply request created",
+          },
+        }),
+      ]);
 
       return toSupply(created);
     },
@@ -214,12 +286,40 @@ export function createSuppliesService(
         },
       });
 
-      await auditService.createAuditLog({
-        action: "SUPPLY_APPROVED",
-        actorId: input.actorId,
-        entity: "SupplyRequest",
-        entityId: input.requestId,
-      });
+      await Promise.all([
+        auditService.createAuditLog({
+          action: "SUPPLY_APPROVED",
+          actorId: input.actorId,
+          entity: "SupplyRequest",
+          entityId: input.requestId,
+        }),
+        deps.workflow?.updateMany({
+          data: {
+            currentStep: "APPROVED",
+            status: "IN_PROGRESS",
+          },
+          where: {
+            entityId: input.requestId,
+          },
+        }),
+        deps.activity?.create({
+          data: {
+            action: "SUPPLY_APPROVED",
+            actorId: input.actorId,
+            entity: "SupplyRequest",
+            entityId: input.requestId,
+          },
+        }),
+        deps.notification?.create({
+          data: {
+            channel: "IN_APP",
+            message: `Supply request ${updated.item} was approved.`,
+            recipientId: updated.requesterId,
+            status: "QUEUED",
+            title: "Supply request approved",
+          },
+        }),
+      ]);
 
       return toSupply(updated);
     },
@@ -237,12 +337,40 @@ export function createSuppliesService(
         },
       });
 
-      await auditService.createAuditLog({
-        action: "SUPPLY_REJECTED",
-        actorId: input.actorId,
-        entity: "SupplyRequest",
-        entityId: input.requestId,
-      });
+      await Promise.all([
+        auditService.createAuditLog({
+          action: "SUPPLY_REJECTED",
+          actorId: input.actorId,
+          entity: "SupplyRequest",
+          entityId: input.requestId,
+        }),
+        deps.workflow?.updateMany({
+          data: {
+            currentStep: "REJECTED",
+            status: "REJECTED",
+          },
+          where: {
+            entityId: input.requestId,
+          },
+        }),
+        deps.activity?.create({
+          data: {
+            action: "SUPPLY_REJECTED",
+            actorId: input.actorId,
+            entity: "SupplyRequest",
+            entityId: input.requestId,
+          },
+        }),
+        deps.notification?.create({
+          data: {
+            channel: "IN_APP",
+            message: `Supply request ${updated.item} was rejected.`,
+            recipientId: updated.requesterId,
+            status: "QUEUED",
+            title: "Supply request rejected",
+          },
+        }),
+      ]);
 
       return toSupply(updated);
     },
@@ -260,12 +388,23 @@ export function createSuppliesService(
         },
       });
 
-      await auditService.createAuditLog({
-        action: "SUPPLY_COMPLETED",
-        actorId: input.actorId,
-        entity: "SupplyRequest",
-        entityId: input.requestId,
-      });
+      await Promise.all([
+        auditService.createAuditLog({
+          action: "SUPPLY_COMPLETED",
+          actorId: input.actorId,
+          entity: "SupplyRequest",
+          entityId: input.requestId,
+        }),
+        deps.workflow?.updateMany({
+          data: {
+            currentStep: "COMPLETED",
+            status: "COMPLETED",
+          },
+          where: {
+            entityId: input.requestId,
+          },
+        }),
+      ]);
 
       return toSupply(updated);
     },

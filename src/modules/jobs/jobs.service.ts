@@ -7,6 +7,7 @@ type JobsDeps = {
   job: {
     create: (args: { data: { key: string; payload?: Record<string, unknown>; runAt: Date; status: "SCHEDULED" } }) => Promise<JobRecord>;
     update: (args: { where: { id: string }; data: { status: JobRecord["status"] } }) => Promise<JobRecord>;
+    findMany: (args: { orderBy: { createdAt: "desc" }; take: number }) => Promise<JobRecord[]>;
   };
 };
 
@@ -28,6 +29,13 @@ export function createJobsService(deps: JobsDeps) {
           runAt: input.runAt,
           status: "SCHEDULED",
         },
+      });
+    },
+
+    async listJobs(): Promise<Job[]> {
+      return deps.job.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
       });
     },
 

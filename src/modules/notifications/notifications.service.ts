@@ -7,6 +7,7 @@ type NotificationsDeps = {
   notification: {
     create: (args: { data: Omit<NotificationRecord, "id" | "createdAt" | "status"> & { status: "QUEUED" } }) => Promise<NotificationRecord>;
     update: (args: { where: { id: string; recipientId: string }; data: { status: "READ" } }) => Promise<NotificationRecord>;
+    findMany: (args: { where: { recipientId: string }; orderBy: { createdAt: "desc" }; take: number }) => Promise<NotificationRecord[]>;
   };
 };
 
@@ -29,6 +30,14 @@ export function createNotificationsService(deps: NotificationsDeps) {
           status: "QUEUED",
           title: input.title,
         },
+      });
+    },
+
+    async listForRecipient(recipientId: string): Promise<Notification[]> {
+      return deps.notification.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        where: { recipientId },
       });
     },
 
