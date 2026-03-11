@@ -7,6 +7,8 @@ import { MetricsCards } from "@/src/components/metrics/MetricsCards";
 import { SuppliesChart } from "@/src/components/metrics/SuppliesChart";
 import { getDashboardMetrics } from "@/src/modules/dashboard/dashboard.metrics";
 import type { AppRoute } from "@/src/types/permissions";
+import { prisma } from "@/src/lib/prisma";
+import { ActivityTimeline } from "@/src/components/activity/ActivityTimeline";
 
 const CARDS: Array<{
   description: string;
@@ -40,6 +42,11 @@ export default async function DashboardPage() {
   const metrics = canAccessMetrics ? await loadDashboardMetrics(role) : null;
   const visibleCards = CARDS.filter((card) => canAccessRoute(role, card.href));
 
+  const recentActivity = await prisma.activity.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+
   return (
     <DashboardLayout currentPath="/dashboard" role={role} title="Dashboard">
       {metrics ? (
@@ -56,6 +63,10 @@ export default async function DashboardPage() {
           </section>
         </>
       ) : null}
+      <section className="mb-6">
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">Recent Activity</h2>
+        <ActivityTimeline items={recentActivity.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))} />
+      </section>
       <section className="grid gap-4 md:grid-cols-3">
         {visibleCards.map((card) => (
           <Link
