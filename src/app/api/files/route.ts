@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveSessionUser } from "../../../lib/auth";
 import { withTraceId } from "../../../lib/observability/http";

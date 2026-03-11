@@ -1,96 +1,69 @@
 import Link from "next/link";
 import { DashboardLayout } from "@/src/components/dashboard/DashboardLayout";
-import { requireAuthenticatedRoute } from "@/src/lib/auth";
-import { canAccessRoute } from "@/src/lib/permissions";
-import { FeedbackChart } from "@/src/components/metrics/FeedbackChart";
-import { MetricsCards } from "@/src/components/metrics/MetricsCards";
-import { SuppliesChart } from "@/src/components/metrics/SuppliesChart";
-import { getDashboardMetrics } from "@/src/modules/dashboard/dashboard.metrics";
-import type { AppRoute } from "@/src/types/permissions";
-import { prisma } from "@/src/lib/prisma";
 import { ActivityTimeline } from "@/src/components/activity/ActivityTimeline";
-
-const CARDS: Array<{
-  description: string;
-  href: AppRoute;
-  title: string;
-}> = [
-  {
-    href: "/users",
-    description: "Manage roles and status for platform users.",
-    title: "Users",
-  },
-  {
-    href: "/supplies",
-    description: "Review supply requests and approvals.",
-    title: "Supplies",
-  },
-  {
-    href: "/feedback",
-    description: "Track and review employee feedback records.",
-    title: "Feedback",
-  },
-];
-
-async function loadDashboardMetrics(role: "ADMIN" | "SUPERVISOR") {
-  return getDashboardMetrics(role);
-}
+import { StatusBadge } from "@/src/components/ui/StatusBadge";
+import { requireAuthenticatedRoute } from "@/src/lib/auth";
+import { prisma } from "@/src/lib/prisma";
+import { getDashboardMetrics } from "@/src/modules/dashboard/dashboard.metrics";
 
 export default async function DashboardPage() {
   const { role } = await requireAuthenticatedRoute("/dashboard");
-  const canAccessMetrics = role === "ADMIN" || role === "SUPERVISOR";
-  const metrics = canAccessMetrics ? await loadDashboardMetrics(role) : null;
-  const visibleCards = CARDS.filter((card) => canAccessRoute(role, card.href));
+  const canSeeOperationalMetrics = role === "ADMIN" || role === "SUPERVISOR";
+
+  const metrics = canSeeOperationalMetrics ? await getDashboardMetrics(role) : null;
 
   const recentActivity = await prisma.activity.findMany({
     orderBy: { createdAt: "desc" },
-    take: 5,
+    take: 8,
   });
 
-  return (
-    <DashboardLayout currentPath="/dashboard" role={role} title="Dashboard">
-      {metrics ? (
-        <>
-          <MetricsCards
-            averageFeedbackScore={metrics.averageFeedbackScore}
-            pendingSupplies={metrics.pendingSupplies}
-            totalFeedback={metrics.totalFeedback}
-            totalUsers={metrics.totalUsers}
-          />
-          <section className="mb-6 grid gap-4 lg:grid-cols-2">
-            <SuppliesChart data={metrics.suppliesByDepartment} />
-            <FeedbackChart data={metrics.feedbackScoreTrend} />
-          </section>
+  const quickActions = [
+    { href: "/supplies", label: "Supplies", description: "Create and track requests." },
+    { href: "/feedback", label: "Feedback", description: "Review performance notes." },
+    { href: "/files", label: "Files", description: "Upload and share docs." },
+    { href: "/activity", label: "Activity", description: "View workflow timeline." },
+  ];
 
-          <section className="mb-6 grid gap-4 md:grid-cols-2">
-            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900">Supply stats</h3>
-              <p className="mt-2 text-sm text-slate-600">Pending requests: {metrics.pendingSupplies}</p>
-              <p className="text-sm text-slate-600">Departments tracked: {metrics.suppliesByDepartment.length}</p>
-            </article>
-            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900">Feedback stats</h3>
-              <p className="mt-2 text-sm text-slate-600">Total feedback: {metrics.totalFeedback}</p>
-              <p className="text-sm text-slate-600">Average score: {metrics.averageFeedbackScore}</p>
-            </article>
-          </section>
-        </>
-      ) : null}
-      <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">Recent Activity</h2>
-        <ActivityTimeline items={recentActivity.map((item: { createdAt: Date } & Record<string, unknown>) => ({ ...item, createdAt: item.createdAt.toISOString() }))} />
+  return (
+    <DashboardLayout currentPath="/dashboard" role={role} title="Operations Dashboard">
+      <section className="mb-5 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending supplies</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics?.pendingSupplies ?? "-"}</p>
+          <StatusBadge tone="warning">Awaiting review</StatusBadge>
+        </article>
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Feedback summary</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{metrics?.totalFeedback ?? 0}</p>
+          <p className="mt-1 text-xs text-slate-600">Average score {metrics?.averageFeedbackScore ?? 0}</p>
+        </article>
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Team visibility</p>
+          <p className="mt-2 text-base font-semibold text-slate-900">{canSeeOperationalMetrics ? "Supervisor view" : "Employee view"}</p>
+          <p className="mt-1 text-xs text-slate-600">Focus on daily actions and approvals.</p>
+        </article>
       </section>
-      <section className="grid gap-4 md:grid-cols-3">
-        {visibleCards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-          >
-            <h2 className="text-lg font-semibold text-slate-900">{card.title}</h2>
-            <p className="mt-2 text-sm text-slate-600">{card.description}</p>
-          </Link>
-        ))}
+
+      <section className="mb-5">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Quick actions</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {quickActions.map((action) => (
+            <Link key={action.href} href={action.href} className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-sm font-semibold text-slate-900">{action.label}</p>
+              <p className="mt-1 text-sm text-slate-600">{action.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Recent activity</h2>
+        <ActivityTimeline
+          items={recentActivity.map((item: { createdAt: Date } & Record<string, unknown>) => ({
+            ...item,
+            createdAt: item.createdAt.toISOString(),
+          }))}
+        />
       </section>
     </DashboardLayout>
   );

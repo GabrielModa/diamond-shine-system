@@ -1,8 +1,7 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
-import { Table, TableContainer } from "@/src/components/ui/Table";
 import { getStatusTone, getSupplyWorkflowState, readApiError } from "./page-state.utils";
 
 type UserRole = "ADMIN" | "SUPERVISOR" | "EMPLOYEE" | "VIEWER";
@@ -20,8 +19,11 @@ export function SuppliesPageClient({ role }: { role: UserRole }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const canCreate = role === "ADMIN" || role === "EMPLOYEE";
   const canReview = role === "ADMIN" || role === "SUPERVISOR";
+
+  const pendingCount = useMemo(() => rows.filter((row) => row.status === "PENDING").length, [rows]);
 
   const load = async () => {
     setLoading(true);
@@ -39,7 +41,9 @@ export function SuppliesPageClient({ role }: { role: UserRole }) {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
   const createSupply = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -57,7 +61,15 @@ export function SuppliesPageClient({ role }: { role: UserRole }) {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">Supply requests</h2>
+          <StatusBadge tone="warning">{pendingCount} pending</StatusBadge>
+        </div>
+        <p className="mt-1 text-xs text-slate-600">Employee submits request → supervisor approves or rejects → approved requests can be completed.</p>
+      </section>
+
       {canCreate ? (
         <form onSubmit={createSupply} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-5">
           <input value={item} onChange={(e) => setItem(e.target.value)} placeholder="Item" className="rounded border px-3 py-2 text-sm" required />
@@ -72,6 +84,7 @@ export function SuppliesPageClient({ role }: { role: UserRole }) {
       {error ? <p className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p> : null}
       <p className="text-sm text-slate-600">Total requests: {total}</p>
       {loading ? <p className="rounded-xl bg-white p-4 text-sm text-slate-500">Loading supply requests...</p> : null}
+
       {!loading && !rows.length ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">No supply requests found.</p> : null}
 
       {!loading && rows.length ? (

@@ -13,12 +13,13 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
   }
 
   return (
-    <ol className="space-y-3">
+    <ol className="relative space-y-3 before:absolute before:bottom-2 before:left-3 before:top-2 before:w-px before:bg-slate-200">
       {items.map((item) => (
-        <li key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
+        <li key={item.id} className="relative rounded-xl border border-slate-200 bg-white p-4 pl-7">
+          <span className="absolute left-[9px] top-6 h-2 w-2 rounded-full bg-slate-500" />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-800">
-              <span className="font-semibold">{item.action}</span> on {item.entity}
+              <span className="font-semibold">{item.action}</span> · {item.entity}
             </p>
             <StatusBadge tone="info">{new Date(item.createdAt).toLocaleString()}</StatusBadge>
           </div>
