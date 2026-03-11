@@ -85,18 +85,12 @@ export function FilesPageClient() {
       {!loading && !rows.length ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">No uploaded files yet.</p> : null}
 
       {!loading && rows.length ? (
-        <ul className="space-y-2">
-          {rows.map((file) => (
-            <li key={file.id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-sm font-semibold text-slate-900">{displayName(file.filename)}</p>
-              <p className="text-xs text-slate-600">{file.mimeType} · {humanSize(file.sizeBytes)}</p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs text-slate-500">{new Date(file.createdAt).toLocaleString()}</span>
-                <a href={`/api/files?filename=${encodeURIComponent(file.filename)}`} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Download</a>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <TableContainer>
+          <Table>
+            <thead className="bg-slate-50 text-slate-600"><tr><th className="px-4 py-2">Name</th><th>Type</th><th>Size</th><th>Created</th><th>Download</th></tr></thead>
+            <tbody>{rows.map((r) => <tr key={r.id} className="border-t"><td className="px-4 py-2">{r.filename}</td><td>{r.mimeType}</td><td>{r.sizeBytes}</td><td>{new Date(r.createdAt).toLocaleString()}</td><td><a className="text-blue-700 underline" href={`/api/files?filename=${encodeURIComponent(r.filename)}`}>Download</a></td></tr>)}</tbody>
+          </Table>
+        </TableContainer>
       ) : null}
     </div>
   );

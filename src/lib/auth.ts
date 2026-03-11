@@ -150,7 +150,7 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export async function getActiveSessionUser(): Promise<{ id: string; role: UserRole } | null> {
+export async function getActiveSessionUser(): Promise<{ id: string; role: UserRole; email: string } | null> {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
@@ -158,6 +158,7 @@ export async function getActiveSessionUser(): Promise<{ id: string; role: UserRo
   }
 
   return {
+    email: session.user.email as string,
     id: session.user.id,
     role: session.user.role as UserRole,
   };

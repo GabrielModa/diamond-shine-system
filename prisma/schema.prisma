@@ -8,21 +8,21 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(uuid())
+  id               String          @id @default(uuid())
   name             String?
-  email            String            @unique
+  email            String          @unique
   emailVerified    DateTime?
   image            String?
   password         String?
-  role             Role              @default(EMPLOYEE)
-  status           UserStatus        @default(ACTIVE)
-  provider         AuthProvider      @default(LOCAL)
-  createdAt        DateTime          @default(now())
+  role             Role            @default(EMPLOYEE)
+  status           UserStatus      @default(ACTIVE)
+  provider         AuthProvider    @default(LOCAL)
+  createdAt        DateTime        @default(now())
   accounts         Account[]
   sessions         Session[]
-  supplyRequests   SupplyRequest[]   @relation("SupplyRequester")
-  feedbackAuthored Feedback[]        @relation("FeedbackReviewer")
-  feedbackReceived Feedback[]        @relation("FeedbackEmployee")
+  supplyRequests   SupplyRequest[] @relation("SupplyRequester")
+  feedbackAuthored Feedback[]      @relation("FeedbackReviewer")
+  feedbackReceived Feedback[]      @relation("FeedbackEmployee")
 }
 
 model Account {
@@ -80,7 +80,14 @@ enum SupplyStatus {
   PENDING
   APPROVED
   REJECTED
+  EMAIL_SENT
   COMPLETED
+}
+
+enum SupplyPriority {
+  LOW
+  NORMAL
+  URGENT
 }
 
 enum WorkflowStatus {
@@ -120,25 +127,30 @@ enum ReportFormat {
 }
 
 model SupplyRequest {
-  id          String       @id @default(uuid())
+  id          String         @id @default(uuid())
   item        String
   quantity    Int
   department  String
-  status      SupplyStatus @default(PENDING)
-  requestDate DateTime     @default(now())
+  status      SupplyStatus   @default(PENDING)
+  priority    SupplyPriority @default(NORMAL)
+  notes       String?
+  emailSentAt DateTime?
+  requestDate DateTime       @default(now())
   requesterId String
-  requester   User         @relation("SupplyRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  requester   User           @relation("SupplyRequester", fields: [requesterId], references: [id], onDelete: Cascade)
 }
 
 model Feedback {
-  id         String   @id @default(uuid())
-  employeeId String
-  reviewerId String
-  score      Int
-  comments   String
-  date       DateTime @default(now())
-  employee   User     @relation("FeedbackEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
-  reviewer   User     @relation("FeedbackReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid())
+  employeeId    String
+  reviewerId    String
+  score         Int
+  averageScore  Float    @default(0)
+  categoryLabel String   @default("Good")
+  comments      String
+  date          DateTime @default(now())
+  employee      User     @relation("FeedbackEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  reviewer      User     @relation("FeedbackReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -171,13 +183,13 @@ model File {
 }
 
 model Job {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   key       String
   payload   Json?
   runAt     DateTime
   status    JobStatus @default(SCHEDULED)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Notification {

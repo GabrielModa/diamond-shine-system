@@ -1,4 +1,5 @@
-export type SupplyStatus = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
+export type SupplyStatus = "PENDING" | "APPROVED" | "REJECTED" | "EMAIL_SENT" | "COMPLETED";
+export type SupplyPriority = "LOW" | "NORMAL" | "URGENT";
 
 export type Supply = {
   id: string;
@@ -6,6 +7,9 @@ export type Supply = {
   quantity: number;
   department: string;
   status: SupplyStatus;
+  priority: SupplyPriority;
+  notes: string | null;
+  emailSentAt: Date | null;
   requestDate: Date;
   requesterId: string;
 };

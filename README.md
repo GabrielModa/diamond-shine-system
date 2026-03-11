@@ -169,3 +169,26 @@ This approach guarantees reliability and maintainability.
 • Improve performance and scalability
 • Add analytics and monitoring
 • Build a maintainable internal platform
+
+---
+
+## Environment Variables
+
+Required:
+
+- `DATABASE_URL` - Prisma connection string (SQLite for local dev, PostgreSQL in production).
+- `NEXTAUTH_SECRET` - NextAuth secret.
+- `NEXTAUTH_URL` - Base app URL.
+
+SMTP / email:
+
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_SECURE` (`true`/`false`)
+- `SMTP_FROM`
+- `SUPPLY_ADMIN_EMAIL` (optional admin email target for supply notifications)
+- `FEEDBACK_REVIEWER_EMAIL` (optional reviewer notification email)
+
+If SMTP env vars are omitted in development, the system defaults to an Ethereal test account.
