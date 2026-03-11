@@ -1,5 +1,3 @@
-import nodemailer from "nodemailer";
-
 type SupplyRequestEmailPayload = {
   id: string;
   item: string;
@@ -16,15 +14,55 @@ type FeedbackEmailPayload = {
   comments: string;
 };
 
-let cachedTransporter: nodemailer.Transporter | null = null;
+type SendMailOptions = {
+  from?: string;
+  html: string;
+  subject: string;
+  to: string;
+};
+
+type MailTransporter = {
+  sendMail: (options: SendMailOptions) => Promise<unknown>;
+};
+
+type MailerModule = {
+  createTestAccount: () => Promise<{
+    pass: string;
+    smtp: { host: string; port: number; secure: boolean };
+    user: string;
+  }>;
+  createTransport: (config: Record<string, unknown>) => MailTransporter;
+};
+
+let cachedTransporter: MailTransporter | null = null;
+let cachedMailer: MailerModule | null = null;
+
+async function getMailer(): Promise<MailerModule | null> {
+  if (cachedMailer) {
+    return cachedMailer;
+  }
+
+  try {
+    const module = await import("nodemailer");
+    cachedMailer = (module.default ?? module) as MailerModule;
+    return cachedMailer;
+  } catch {
+    return null;
+  }
+}
 
 async function getTransporter() {
   if (cachedTransporter) {
     return cachedTransporter;
   }
 
+  const mailer = await getMailer();
+  if (!mailer) {
+    return null;
+  }
+
   if (process.env.SMTP_HOST) {
-    cachedTransporter = nodemailer.createTransport({
+    cachedTransporter = mailer.createTransport({
       auth: process.env.SMTP_USER
         ? { pass: process.env.SMTP_PASS ?? "", user: process.env.SMTP_USER }
         : undefined,
@@ -35,8 +73,8 @@ async function getTransporter() {
     return cachedTransporter;
   }
 
-  const testAccount = await nodemailer.createTestAccount();
-  cachedTransporter = nodemailer.createTransport({
+  const testAccount = await mailer.createTestAccount();
+  cachedTransporter = mailer.createTransport({
     auth: {
       pass: testAccount.pass,
       user: testAccount.user,
@@ -49,8 +87,13 @@ async function getTransporter() {
   return cachedTransporter;
 }
 
-async function sendEmail(options: nodemailer.SendMailOptions) {
+async function sendEmail(options: SendMailOptions) {
   const transporter = await getTransporter();
+  if (!transporter) {
+    console.log("[EMAIL] nodemailer unavailable, skipping email dispatch");
+    return null;
+  }
+
   const from = process.env.SMTP_FROM ?? "no-reply@diamondshine.local";
   return transporter.sendMail({
     from,

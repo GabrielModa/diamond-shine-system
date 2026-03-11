@@ -12,6 +12,9 @@ export type DashboardMetrics = {
   totalFeedback: number;
   averageFeedbackScore: number;
   pendingSupplies: number;
+  activeUsers?: number;
+  approvedSupplies?: number;
+  rejectedSupplies?: number;
   suppliesByDepartment: Array<{ count: number; department: string }>;
   feedbackScoreTrend: Array<{ averageScore: number; date: string }>;
 };
@@ -24,7 +27,7 @@ type DashboardServiceDeps = {
   supplyRequest: {
     count: (args?: { where?: Record<string, unknown> }) => Promise<number>;
     findMany: (args: { select: Record<string, boolean>; where?: Record<string, unknown>; orderBy?: { requestDate: "desc" }; take?: number }) => Promise<Array<Record<string, unknown>>>;
-    groupBy: (args: { by: ["item"]; _count: { item: true }; orderBy: { _count: { item: "desc" } }; take: number }) => Promise<Array<{ item: string; _count: { item: number } }>>;
+    groupBy?: (args: { by: ["item"]; _count: { item: true }; orderBy: { _count: { item: "desc" } }; take: number }) => Promise<Array<{ item: string; _count: { item: number } }>>;
   };
   user: { count: (args?: { where?: { status: "ACTIVE" } }) => Promise<number> };
 };
@@ -37,8 +40,9 @@ export function createDashboardService(deps: DashboardServiceDeps) {
     async getMetrics(actorRole: UserRole): Promise<DashboardMetrics> {
       if (actorRole !== "ADMIN" && actorRole !== "SUPERVISOR") throw new Error("Only admins and supervisors can view dashboard metrics.");
 
-      const [totalUsers, pending, emailSent, completed, totalRequests, feedbackAggregate, suppliesRowsRaw, feedbackRows, priorityRowsRaw, mostRequested, recentRequestsRaw] = await Promise.all([
+      const [totalUsers, activeUsers, pending, emailSent, completed, totalRequests, feedbackAggregate, suppliesRowsRaw, feedbackRows, priorityRowsRaw, recentRequestsRaw] = await Promise.all([
         deps.user.count(),
+        deps.user.count({ where: { status: "ACTIVE" } }),
         deps.supplyRequest.count({ where: { status: "PENDING" } }),
         deps.supplyRequest.count({ where: { status: "EMAIL_SENT" } }),
         deps.supplyRequest.count({ where: { status: "COMPLETED" } }),
@@ -47,9 +51,17 @@ export function createDashboardService(deps: DashboardServiceDeps) {
         deps.supplyRequest.findMany({ select: { department: true } }),
         deps.feedback.findMany({ orderBy: { date: "asc" }, select: { date: true, score: true } }),
         deps.supplyRequest.findMany({ select: { priority: true } }),
-        deps.supplyRequest.groupBy({ by: ["item"], _count: { item: true }, orderBy: { _count: { item: "desc" } }, take: 1 }),
         deps.supplyRequest.findMany({ orderBy: { requestDate: "desc" }, select: { id: true, item: true, priority: true, requestDate: true, status: true }, take: 20 }),
       ]);
+
+      const mostRequested = deps.supplyRequest.groupBy
+        ? await deps.supplyRequest.groupBy({
+            by: ["item"],
+            _count: { item: true },
+            orderBy: { _count: { item: "desc" } },
+            take: 1,
+          })
+        : [];
 
       const priorities = { low: 0, normal: 0, urgent: 0 };
       for (const row of priorityRowsRaw as Array<{ priority: string }>) {
@@ -60,12 +72,15 @@ export function createDashboardService(deps: DashboardServiceDeps) {
 
       return {
         averageFeedbackScore: Number((feedbackAggregate._avg.score ?? 0).toFixed(2)),
+        activeUsers,
         completed,
         emailSent,
         feedbackScoreTrend: buildFeedbackTrend(feedbackRows),
         mostRequestedProduct: mostRequested[0]?.item ?? null,
         pending,
         pendingSupplies: pending,
+        approvedSupplies: emailSent,
+        rejectedSupplies: completed,
         priorityCounters: priorities,
         recentRequests: recentRequestsRaw as DashboardMetrics["recentRequests"],
         suppliesByDepartment: buildSuppliesByDepartment(suppliesRowsRaw as Array<{ department: string }>),

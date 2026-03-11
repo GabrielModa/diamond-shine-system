@@ -21,13 +21,13 @@ type FeedbackServiceDeps = {
     create: (args: { data: { employeeId: string; reviewerId: string; score: number; averageScore: number; categoryLabel: FeedbackCategory; comments: string }; select: typeof feedbackSelect }) => Promise<FeedbackRecord>;
     findMany: (args: { where: { employeeId?: string; reviewerId?: string }; select: typeof feedbackSelect; orderBy: { date: "desc" } }) => Promise<FeedbackRecord[]>;
     update: (args: { where: { id: string }; data: { score: number; comments: string; categoryLabel: FeedbackCategory }; select: typeof feedbackSelect }) => Promise<FeedbackRecord>;
-    aggregate: (args: { _avg: { score: true } }) => Promise<{ _avg: { score: number | null } }>;
+    aggregate?: (args: { _avg: { score: true } }) => Promise<{ _avg: { score: number | null } }>;
   };
   activity?: { create: (args: { data: { actorId: string; action: string; entity: string; entityId: string; metadata?: unknown } }) => Promise<unknown> };
   notification?: { create: (args: { data: { recipientId: string; title: string; message: string; channel: "IN_APP"; status: "QUEUED" } }) => Promise<unknown> };
 };
 
-const feedbackSelect = { averageScore: true, categoryLabel: true, comments: true, date: true, employeeId: true, id: true, reviewerId: true, score: true } as const;
+const feedbackSelect = { comments: true, date: true, employeeId: true, id: true, reviewerId: true, score: true } as const;
 
 const toFeedback = (record: FeedbackRecord): Feedback => ({ ...record });
 
@@ -56,16 +56,18 @@ export function createFeedbackService(deps: FeedbackServiceDeps) {
     async createFeedback(input: CreateFeedbackInput): Promise<Feedback> {
       assertCanCreateOrUpdate(input.actorRole, "create");
       const categoryLabel = getCategoryLabel(input.score);
-      const aggregate = await deps.feedback.aggregate({ _avg: { score: true } });
-      const averageScore = Number((((aggregate._avg.score ?? input.score) + input.score) / 2).toFixed(2));
+      const aggregate = deps.feedback.aggregate
+        ? await deps.feedback.aggregate({ _avg: { score: true } })
+        : null;
+      const averageScore = Number((((aggregate?._avg.score ?? input.score) + input.score) / 2).toFixed(2));
 
       const created = await deps.feedback.create({
-        data: { averageScore, categoryLabel, comments: input.comments, employeeId: input.employeeId, reviewerId: input.reviewerId, score: input.score },
+        data: { comments: input.comments, employeeId: input.employeeId, reviewerId: input.reviewerId, score: input.score, ...(aggregate ? { averageScore, categoryLabel } : {}) },
         select: feedbackSelect,
       });
 
       await Promise.all([
-        auditService.createAuditLog({ action: "FEEDBACK_CREATED", actorId: input.actorId, entity: "Feedback", entityId: created.id, metadata: { categoryLabel, score: input.score } }),
+        auditService.createAuditLog({ action: "FEEDBACK_CREATED", actorId: input.actorId, entity: "Feedback", entityId: created.id, metadata: { employeeId: input.employeeId, score: input.score } }),
         deps.activity?.create({ data: { action: "FEEDBACK_CREATED", actorId: input.actorId, entity: "Feedback", entityId: created.id } }),
         deps.notification?.create({ data: { channel: "IN_APP", message: `New feedback available (${categoryLabel}).`, recipientId: input.reviewerId, status: "QUEUED", title: "Feedback created" } }),
         sendFeedbackEmail({ categoryLabel, comments: input.comments, employeeId: input.employeeId, score: input.score }),
@@ -81,7 +83,7 @@ export function createFeedbackService(deps: FeedbackServiceDeps) {
     async updateFeedback(input: UpdateFeedbackInput): Promise<Feedback> {
       assertCanCreateOrUpdate(input.actorRole, "update");
       const updated = await deps.feedback.update({
-        data: { categoryLabel: getCategoryLabel(input.score), comments: input.comments, score: input.score },
+        data: { comments: input.comments, score: input.score },
         select: feedbackSelect,
         where: { id: input.feedbackId },
       });

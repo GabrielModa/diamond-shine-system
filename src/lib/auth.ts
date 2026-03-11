@@ -150,15 +150,26 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export async function getActiveSessionUser(): Promise<{ id: string; role: UserRole; email: string } | null> {
+export async function getActiveSessionUser(): Promise<{ id: string; role: UserRole; email?: string } | null> {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
     return null;
   }
 
+  if (prisma.user && typeof prisma.user.findUnique === "function") {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { status: true },
+    });
+
+    if (user?.status !== "ACTIVE") {
+      return null;
+    }
+  }
+
   return {
-    email: session.user.email as string,
+    email: session.user.email as string | undefined,
     id: session.user.id,
     role: session.user.role as UserRole,
   };
