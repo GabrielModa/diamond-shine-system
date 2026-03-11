@@ -2,39 +2,84 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import { Table, TableContainer } from "@/src/components/ui/Table";
+import { readApiError } from "./page-state.utils";
 
 type Row = { id: string; filename: string; mimeType: string; sizeBytes: number; createdAt: string };
 
 export function FilesPageClient() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [filename, setFilename] = useState("");
-  const [mimeType, setMimeType] = useState("application/pdf");
-  const [sizeBytes, setSizeBytes] = useState(1024);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
-  const load = () => fetch("/api/files").then((r) => r.json()).then(setRows).catch(() => setRows([]));
-  useEffect(() => { load(); }, []);
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/files", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Failed to load files."));
+      }
+      setRows((await response.json()) as Row[]);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load files.");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    await fetch("/api/files", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename, mimeType, sizeBytes }) });
-    setFilename("");
-    load();
+    if (!selectedFile) {
+      setError("Please select a file before uploading.");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    const response = await fetch("/api/files", { method: "POST", body: formData });
+    if (!response.ok) {
+      setError(await readApiError(response, "Failed to upload file."));
+      setUploading(false);
+      return;
+    }
+
+    setSelectedFile(null);
+    const input = document.getElementById("upload-file") as HTMLInputElement | null;
+    if (input) input.value = "";
+
+    await load();
+    setUploading(false);
   };
 
   return (
     <div className="space-y-5">
-      <form onSubmit={submit} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-4">
-        <input value={filename} onChange={(e) => setFilename(e.target.value)} placeholder="filename.ext" className="rounded border px-3 py-2 text-sm" required />
-        <input value={mimeType} onChange={(e) => setMimeType(e.target.value)} className="rounded border px-3 py-2 text-sm" required />
-        <input value={sizeBytes} onChange={(e) => setSizeBytes(Number(e.target.value))} type="number" min={1} className="rounded border px-3 py-2 text-sm" required />
-        <button className="rounded bg-slate-900 px-3 py-2 text-sm text-white">Register Upload</button>
+      <form onSubmit={submit} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-3">
+        <input id="upload-file" type="file" onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} className="rounded border px-3 py-2 text-sm" required />
+        <div className="text-xs text-slate-500">Files are stored in <code>/uploads</code> and metadata is saved in the database.</div>
+        <button disabled={uploading} className="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60">{uploading ? "Uploading..." : "Upload File"}</button>
       </form>
-      <TableContainer>
-        <Table>
-          <thead className="bg-slate-50 text-slate-600"><tr><th className="px-4 py-2">Name</th><th>Type</th><th>Size</th><th>Created</th></tr></thead>
-          <tbody>{rows.map((r) => <tr key={r.id} className="border-t"><td className="px-4 py-2">{r.filename}</td><td>{r.mimeType}</td><td>{r.sizeBytes}</td><td>{new Date(r.createdAt).toLocaleString()}</td></tr>)}</tbody>
-        </Table>
-      </TableContainer>
+
+      {error ? <p className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p> : null}
+      {loading ? <p className="rounded-xl bg-white p-4 text-sm text-slate-500">Loading files...</p> : null}
+      {!loading && !rows.length ? <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">No uploaded files yet.</p> : null}
+
+      {!loading && rows.length ? (
+        <TableContainer>
+          <Table>
+            <thead className="bg-slate-50 text-slate-600"><tr><th className="px-4 py-2">Name</th><th>Type</th><th>Size</th><th>Created</th></tr></thead>
+            <tbody>{rows.map((r) => <tr key={r.id} className="border-t"><td className="px-4 py-2">{r.filename}</td><td>{r.mimeType}</td><td>{r.sizeBytes}</td><td>{new Date(r.createdAt).toLocaleString()}</td></tr>)}</tbody>
+          </Table>
+        </TableContainer>
+      ) : null}
     </div>
   );
 }

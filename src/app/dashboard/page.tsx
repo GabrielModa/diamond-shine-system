@@ -61,11 +61,24 @@ export default async function DashboardPage() {
             <SuppliesChart data={metrics.suppliesByDepartment} />
             <FeedbackChart data={metrics.feedbackScoreTrend} />
           </section>
+
+          <section className="mb-6 grid gap-4 md:grid-cols-2">
+            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Supply stats</h3>
+              <p className="mt-2 text-sm text-slate-600">Pending requests: {metrics.pendingSupplies}</p>
+              <p className="text-sm text-slate-600">Departments tracked: {metrics.suppliesByDepartment.length}</p>
+            </article>
+            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Feedback stats</h3>
+              <p className="mt-2 text-sm text-slate-600">Total feedback: {metrics.totalFeedback}</p>
+              <p className="text-sm text-slate-600">Average score: {metrics.averageFeedbackScore}</p>
+            </article>
+          </section>
         </>
       ) : null}
       <section className="mb-6">
         <h2 className="mb-3 text-lg font-semibold text-slate-900">Recent Activity</h2>
-        <ActivityTimeline items={recentActivity.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))} />
+        <ActivityTimeline items={recentActivity.map((item: { createdAt: Date } & Record<string, unknown>) => ({ ...item, createdAt: item.createdAt.toISOString() }))} />
       </section>
       <section className="grid gap-4 md:grid-cols-3">
         {visibleCards.map((card) => (
